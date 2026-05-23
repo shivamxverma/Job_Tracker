@@ -1,0 +1,2 @@
+[console_scripts]
+linkedln-scrapper = linkedln_scrapper.cli.commands:main

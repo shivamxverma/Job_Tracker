@@ -25,6 +25,10 @@ SCRIPT_CONFIG = {
         "script": "instahyre_jobs.py",
         "default_output": f"{date.today()}/instahyre_entry_level_jobs.csv",
     },
+    "naukri": {
+        "script": "naukri_jobs.py",
+        "default_output": "naukri_entry_level_jobs.csv",
+    },
     "ats": {
         "script": "jobs_scraper.py",
         "default_output": f"{date.today()}/entry_level_jobs.csv",
@@ -69,6 +73,11 @@ def parse_args() -> argparse.Namespace:
         help="Chrome user data dir for Instahyre scraping.",
     )
     parser.add_argument(
+        "--naukri-profile-dir",
+        default="naukri-chrome-data",
+        help="Chrome user data dir for Naukri scraping.",
+    )
+    parser.add_argument(
         "--linkedin-scrolls",
         type=int,
         default=5,
@@ -85,6 +94,12 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=5,
         help="Scroll count for Instahyre scraping.",
+    )
+    parser.add_argument(
+        "--naukri-scrolls",
+        type=int,
+        default=5,
+        help="Scroll count for Naukri scraping.",
     )
     parser.add_argument(
         "--sources-file",
@@ -164,6 +179,19 @@ def build_command(target: str, args: argparse.Namespace, output_dir: Path) -> li
                 ensure_dir(args.instahyre_profile_dir),
                 "--scrolls",
                 str(args.instahyre_scrolls),
+                "--output",
+                str(output_path),
+            ]
+        )
+        if args.headless:
+            command.append("--headless")
+    elif target == "naukri":
+        command.extend(
+            [
+                "--profile-dir",
+                ensure_dir(args.naukri_profile_dir),
+                "--scrolls",
+                str(args.naukri_scrolls),
                 "--output",
                 str(output_path),
             ]
