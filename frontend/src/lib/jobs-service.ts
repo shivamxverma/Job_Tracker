@@ -12,8 +12,9 @@ export async function listJobs(): Promise<Job[]> {
 
   return jobs.map((job) => ({
     ...job,
-    applyUrl: normalizeJobUrl(job.source, job.applyUrl),
+    applyUrl: job.applyUrl ? normalizeJobUrl(job.source, job.applyUrl) : null,
     createdAt: job.createdAt.toISOString(),
     updatedAt: job.updatedAt.toISOString(),
+    appliedAt: job.appliedAt ? job.appliedAt.toISOString() : null,
   }));
 }

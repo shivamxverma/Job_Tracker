@@ -16,7 +16,10 @@ export async function ingestJobs(jobs: Job[]): Promise<{ upserted: number; faile
     try {
       await prisma.job.upsert({
         where: {
-          applyUrl: job.applyUrl,
+          source_externalId: {
+            source: job.source,
+            externalId: job.externalId,
+          },
         },
         update: {
           title: job.title,

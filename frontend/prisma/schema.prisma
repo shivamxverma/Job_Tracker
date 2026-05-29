@@ -8,19 +8,26 @@ generator client {
 }
 
 model Job {
-  id         String   @id @default(cuid())
-  source     String   // e.g. "wellfound", "yc", "linkedin"
-  externalId String   @map("external_id")
+  id         String    @id @default(cuid())
+  source     String    // e.g. "wellfound", "yc", "linkedin"
+  externalId String    @map("external_id")
   title      String
   company    String
   location   String
   salary     String?
-  applyUrl   String   @unique @map("apply_url")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+  applyUrl   String?   @map("apply_url")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at")
+
+  // Tracking fields
+  status     String?
+  platform   String?
+  notes      String?
+  appliedAt  DateTime? @map("applied_at")
 
   @@unique([source, externalId])
   @@index([source])
   @@index([company])
+  @@index([status])
 }

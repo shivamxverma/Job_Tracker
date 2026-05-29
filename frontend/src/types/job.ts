@@ -5,9 +5,13 @@ export type Job = {
   company: string;
   location: string;
   salary: string | null;
-  applyUrl: string;
+  applyUrl: string | null;
   createdAt: string;
   updatedAt: string;
+  status?: string | null;
+  platform?: string | null;
+  notes?: string | null;
+  appliedAt?: string | null;
 };
 
 export type JobsResponse = {
