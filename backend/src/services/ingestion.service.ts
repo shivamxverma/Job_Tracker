@@ -1,6 +1,7 @@
 import { prisma } from "./prisma.js";
 import type { Job } from "../connectors/types.js";
 import { isIndiaJob } from "../shared/location-filter.js";
+import { isAllowedRole } from "../shared/role-filter.js";
 
 /**
  * Ingestion Service
@@ -16,6 +17,11 @@ export async function ingestJobs(jobs: Job[]): Promise<{ upserted: number; faile
   for (const job of jobs) {
     if (!isIndiaJob(job.location)) {
       console.log(`[Ingestion Service] Skipping job listing "${job.title}" at "${job.company}" because location "${job.location}" is not in India.`);
+      continue;
+    }
+
+    if (!isAllowedRole(job.title)) {
+      console.log(`[Ingestion Service] Skipping job listing "${job.title}" at "${job.company}" because title does not match allowed roles.`);
       continue;
     }
 

@@ -47,9 +47,8 @@ export async function runAllConnectors(): Promise<{ totalFetched: number; upsert
   try {
     console.log("[Connector Runner] Launching LinkedIn Jobs Connector...");
     const linkedinJobs = await searchLinkedinJobs({
-      keywords: "Software Engineer",
+      keywords: '"Software Engineer" OR "Backend Developer" OR "Full Stack Developer" OR "Software Developer" OR "AI Engineer"',
       location: "India",
-      experienceLevel: "entry",
       workplaceType: "remote",
     });
     allJobs.push(...linkedinJobs);
