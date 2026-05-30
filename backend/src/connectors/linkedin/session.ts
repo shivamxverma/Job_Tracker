@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { launchStealthBrowser, isBlockedPage } from "../../services/stealth-browser.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -61,5 +62,70 @@ export async function saveLinkedinSession(): Promise<void> {
     throw error;
   } finally {
     await browser.close();
+  }
+}
+
+/**
+ * Validates whether the saved LinkedIn session cookies are still active.
+ * Returns true if session is valid, false if expired/blocked.
+ */
+export async function validateLinkedinSession(): Promise<boolean> {
+  if (!hasLinkedinSession()) {
+    console.warn("[LinkedIn Session] No session file found.");
+    return false;
+  }
+
+  const sessionPath = getLinkedinSessionPath();
+
+  // Check cookie expiry from the session file
+  try {
+    const sessionData = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
+    const cookies = sessionData.cookies || [];
+    const nowSeconds = Date.now() / 1000;
+
+    // Check if key LinkedIn cookies (li_at) are expired
+    const liAtCookie = cookies.find((c: any) => c.name === "li_at");
+    if (liAtCookie) {
+      const expires = liAtCookie.expires ?? liAtCookie.expirationDate ?? 0;
+      if (expires > 0 && expires < nowSeconds) {
+        console.warn("[LinkedIn Session] Session cookie 'li_at' has expired.");
+        return false;
+      }
+    } else {
+      console.warn("[LinkedIn Session] Critical cookie 'li_at' not found in session.");
+      return false;
+    }
+
+    // Live validation: open LinkedIn and check for redirect
+    console.log("[LinkedIn Session] Performing live session validation...");
+    const { browser, context } = await launchStealthBrowser({
+      headless: true,
+      sessionStatePath: sessionPath,
+    });
+
+    try {
+      const page = await context.newPage();
+      await page.goto("https://www.linkedin.com/feed/", {
+        waitUntil: "domcontentloaded",
+        timeout: 30000,
+      });
+
+      await page.waitForTimeout(3000);
+
+      const currentUrl = page.url();
+      if (isBlockedPage(currentUrl)) {
+        console.warn(`[LinkedIn Session] Session invalid — redirected to: ${currentUrl}`);
+        return false;
+      }
+
+      console.log("[LinkedIn Session] Session is valid and active.");
+      return true;
+    } finally {
+      await context.close();
+      await browser.close();
+    }
+  } catch (error) {
+    console.error("[LinkedIn Session] Validation error:", error);
+    return false;
   }
 }

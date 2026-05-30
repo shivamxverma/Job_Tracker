@@ -1,6 +1,7 @@
 import { Page } from "playwright";
 import { ApplicationAdapter, ApplicationContext } from "./adapter.interface.js";
 import * as fs from "fs";
+import { humanClick, humanType, humanPause, humanSelect, microPause, detectBlock } from "../../services/human-like.js";
 
 export class LinkedinApplyAdapter implements ApplicationAdapter {
   canHandle(url: string, source: string): boolean {
@@ -15,8 +16,17 @@ export class LinkedinApplyAdapter implements ApplicationAdapter {
 
     await page.goto(applyUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
 
-    // Wait a brief moment to ensure full render
-    await page.waitForTimeout(3000);
+    // Human-like initial page reading pause
+    await humanPause(page, 3000, 6000);
+
+    // Check if we got redirected to a block/challenge page
+    const blockType = detectBlock(page.url());
+    if (blockType) {
+      throw new Error(
+        `LinkedIn blocked access (${blockType}). Current URL: ${page.url()}. ` +
+        `Try refreshing your session cookies or wait a few hours before retrying.`
+      );
+    }
 
     // 1. Locate the Easy Apply button
     const easyApplyButton = await this.findEasyApplyButton(page);
@@ -32,7 +42,7 @@ export class LinkedinApplyAdapter implements ApplicationAdapter {
     }
 
     console.log("[LinkedIn Adapter] Found 'Easy Apply' button! Clicking to open application modal...");
-    await easyApplyButton.click();
+    await humanClick(page, easyApplyButton);
 
     // 2. Wait for the application modal to appear
     await page.waitForSelector("div[role='dialog']", { timeout: 15000 });
@@ -46,7 +56,16 @@ export class LinkedinApplyAdapter implements ApplicationAdapter {
       console.log(`[LinkedIn Adapter] Processing step ${steps}...`);
 
       // Add a slight delay for modal transitions
-      await page.waitForTimeout(1500);
+      await humanPause(page, 2000, 5000);
+
+      // Check for block/challenge mid-flow
+      const midFlowBlock = detectBlock(page.url());
+      if (midFlowBlock) {
+        throw new Error(
+          `LinkedIn triggered a ${midFlowBlock} challenge during the application flow. ` +
+          `Current URL: ${page.url()}. Session may need refreshing.`
+        );
+      }
 
       // Check for success screen
       const isSuccess = await this.checkSuccessScreen(page);
@@ -73,7 +92,7 @@ export class LinkedinApplyAdapter implements ApplicationAdapter {
       const buttonText = (await nextButton.textContent()) || "";
       console.log(`[LinkedIn Adapter] Clicking button: "${buttonText.trim()}"`);
 
-      await nextButton.click();
+      await humanClick(page, nextButton);
 
       // If it was "Submit application", we are done! Wait for success or confirmation screen
       if (buttonText.toLowerCase().includes("submit")) {
@@ -147,7 +166,7 @@ export class LinkedinApplyAdapter implements ApplicationAdapter {
       await fileInput.setInputFiles(resumePath);
       
       // Wait for any progress bar or upload indicator to finish
-      await page.waitForTimeout(3000);
+      await humanPause(page, 3000, 5000);
     }
   }
 
@@ -173,17 +192,17 @@ export class LinkedinApplyAdapter implements ApplicationAdapter {
       if (!currentValue) {
         if (labelLower.includes("phone") || labelLower.includes("mobile")) {
           console.log("[LinkedIn Adapter] Filling Phone number...");
-          await field.fill("+1 (555) 019-2834"); // Standard mock phone number
+          await humanType(page, field, "+1 (555) 019-2834"); // Standard mock phone number
         } else if (labelLower.includes("experience") || labelLower.includes("years")) {
           console.log("[LinkedIn Adapter] Answering Experience years question with '2'...");
-          await field.fill("2");
+          await humanType(page, field, "2");
         } else if (labelLower.includes("salary") || labelLower.includes("compensation")) {
           console.log("[LinkedIn Adapter] Answering Salary expectations question...");
-          await field.fill("Open / Negotiable");
+          await humanType(page, field, "Open / Negotiable");
         } else {
           // Fallback to "Yes" or a default "2" if it's a numeric field
           const isNumeric = await field.getAttribute("type") === "number" || labelLower.includes("how many");
-          await field.fill(isNumeric ? "2" : "Yes");
+          await humanType(page, field, isNumeric ? "2" : "Yes");
         }
       }
     }
@@ -206,17 +225,17 @@ export class LinkedinApplyAdapter implements ApplicationAdapter {
         
         // Auto select YES for work authorization
         if (labelLower.includes("authorized") || labelLower.includes("citizen") || labelLower.includes("work in")) {
-          await select.selectOption({ label: "Yes" });
+          await humanSelect(page, select, { label: "Yes" });
         } else if (labelLower.includes("sponsorship") || labelLower.includes("require visa")) {
-          await select.selectOption({ label: "No" });
+          await humanSelect(page, select, { label: "No" });
         } else if (labelLower.includes("proficiency") || labelLower.includes("english")) {
-          await select.selectOption({ label: "Professional" });
+          await humanSelect(page, select, { label: "Professional" });
         } else {
           // If no matching rule, select the first non-empty option
           const options = await select.locator("option").all();
           if (options.length > 1) {
             const firstValue = (await options[1].getAttribute("value")) || "";
-            await select.selectOption({ value: firstValue });
+            await humanSelect(page, select, { value: firstValue });
           }
         }
       }
@@ -248,12 +267,12 @@ export class LinkedinApplyAdapter implements ApplicationAdapter {
 
         const radioToClick = fieldset.locator(`label:has-text("${targetText}")`).first();
         if (await radioToClick.count() > 0) {
-          await radioToClick.click();
+          await humanClick(page, radioToClick);
         } else {
           // Fallback: click the first radio option
           const firstOption = fieldset.locator("input[type='radio']").first();
           if (await firstOption.count() > 0) {
-            await firstOption.click();
+            await humanClick(page, firstOption);
           }
         }
       }

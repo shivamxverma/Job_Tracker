@@ -1,4 +1,5 @@
-import { chromium, type BrowserContext, type Route } from "playwright";
+import { type BrowserContext, type Route } from "playwright";
+import { launchStealthBrowser, isBlockedPage } from "../../services/stealth-browser.js";
 import { buildLinkedinSearchUrl } from "./search.js";
 import { getLinkedinSessionPath, hasLinkedinSession } from "./session.js";
 import type { LinkedinSearchConfig } from "./types.js";
@@ -102,17 +103,12 @@ export async function fetchRenderedLinkedinPage(
     );
   }
 
-  const browser = await chromium.launch({
+  const { browser, context } = await launchStealthBrowser({
     headless: options.headless ?? true,
+    sessionStatePath: sessionPath,
   });
 
   try {
-    const context = await browser.newContext({
-      storageState: sessionPath,
-      viewport: { width: 1366, height: 900 },
-      userAgent:
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    });
 
     await blockHeavyResources(context);
 
@@ -125,6 +121,13 @@ export async function fetchRenderedLinkedinPage(
     });
 
     await page.waitForLoadState("load", { timeout: 30000 }).catch(() => undefined);
+
+    // Check if we got blocked/redirected
+    if (isBlockedPage(page.url())) {
+      throw new Error(
+        `[LinkedIn Fetcher] Session blocked or expired. Redirected to: ${page.url()}. Re-run 'pnpm save-session:linkedin'.`
+      );
+    }
     await page.waitForSelector(
       ".jobs-search-results__list-item, .job-card-container, .base-card, a[href*='/jobs/view/']",
       { timeout: 30000 },

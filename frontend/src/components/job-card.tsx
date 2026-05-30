@@ -78,13 +78,42 @@ export function JobCard({ job, onTrack, onSelect }: JobCardProps) {
       </div>
 
       <div className="job-card__footer" onClick={(e) => e.stopPropagation()}>
-        {job.applyUrl ? (
-          <a href={job.applyUrl} target="_blank" rel="noreferrer">
-            Apply now
-          </a>
-        ) : (
-          <span className="no-apply-link">No link</span>
-        )}
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+          {job.applyUrl ? (
+            <a href={job.applyUrl} target="_blank" rel="noreferrer">
+              Apply now
+            </a>
+          ) : (
+            <span className="no-apply-link">No link</span>
+          )}
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect?.(job);
+            }}
+            className="auto-apply-button"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: "42px",
+              padding: "0.65rem 1.15rem",
+              borderRadius: "999px",
+              background: "linear-gradient(90deg, #6366f1 0%, #a855f7 100%)",
+              color: "white",
+              fontSize: "0.92rem",
+              fontWeight: 600,
+              border: "none",
+              cursor: "pointer",
+              transition: "all 180ms ease, transform 100ms ease",
+              fontFamily: "inherit",
+              boxShadow: "0 2px 8px rgba(99, 102, 241, 0.25)",
+            }}
+          >
+            ⚡ Auto Apply
+          </button>
+        </div>
 
         <button
           onClick={(e) => {
