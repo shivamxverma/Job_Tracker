@@ -2,15 +2,88 @@ import { Router, Request, Response } from "express";
 import { prisma } from "../services/prisma.js";
 import { GeminiService } from "../services/gemini.service.js";
 import { EmailService } from "../services/email.service.js";
-import { requireAuth } from "./auth.middleware.js";
+import { GmailService } from "../services/gmail.service.js";
+import { requireAuth, requireSendAuth } from "./auth.middleware.js";
 
 export const outreachRouter = Router();
 outreachRouter.use(requireAuth);
 
 const geminiService = new GeminiService();
 const emailService = new EmailService();
+const gmailService = new GmailService();
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * 0. Verify Security Passcode for Email Sending
+ * GET /outreach/auth/verify
+ */
+outreachRouter.get("/outreach/auth/verify", requireSendAuth, (req: Request, res: Response) => {
+  res.status(200).json({ success: true, message: "Passcode successfully verified." });
+});
+
+/**
+ * Google OAuth 2.0 Authorization Endpoints
+ */
+outreachRouter.get("/outreach/auth/google", (req: Request, res: Response) => {
+  console.log(`[Outreach Router] GET /outreach/auth/google route hit! Host: ${req.headers.host}`);
+  const redirectUri = `${req.protocol}://${req.headers.host}/api/auth/callback/google`;
+  const url = gmailService.getAuthUrl(redirectUri);
+  res.redirect(url);
+});
+
+outreachRouter.get("/api/auth/callback/google", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { code } = req.query as { code?: string };
+    if (!code) {
+      res.status(400).send("Authorization code is missing.");
+      return;
+    }
+    const redirectUri = `${req.protocol}://${req.headers.host}/api/auth/callback/google`;
+    await gmailService.exchangeCodeForTokens(code, redirectUri);
+    
+    res.send(`
+      <html>
+        <head>
+          <title>Google Authentication Successful</title>
+          <script>
+            window.opener?.postMessage("oauth-success", "*");
+            window.close();
+          </script>
+        </head>
+        <body style="font-family: sans-serif; text-align: center; padding: 3rem; background: #0f172a; color: #fff;">
+          <h2 style="color: #34d399;">Authentication Successful ✅</h2>
+          <p>Google Account connected. You can close this window now.</p>
+          <script>
+            setTimeout(() => { window.close(); }, 2000);
+          </script>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error("[Outreach Router] OAuth callback failed:", error);
+    res.status(500).send(`OAuth Authentication failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+});
+
+outreachRouter.get("/outreach/auth/google/status", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const token = await prisma.googleToken.findUnique({ where: { id: "singleton" } });
+    if (!token) {
+      res.status(200).json({ authenticated: false, email: null });
+      return;
+    }
+    try {
+      const accessToken = await gmailService.getValidAccessToken();
+      const email = await gmailService.getAuthenticatedUserEmail(accessToken);
+      res.status(200).json({ authenticated: true, email });
+    } catch (err) {
+      res.status(200).json({ authenticated: false, email: null });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: String(error) });
+  }
+});
 
 /**
  * 1. Add Recruiter Leads (Single or Bulk)
@@ -256,7 +329,7 @@ outreachRouter.post("/outreach/generate-all", async (req: Request, res: Response
  * 6. Send a Single Specific Email Immediately
  * POST /outreach/send/:id (Sends message directly by message ID, or INITIAL email of lead by lead ID)
  */
-outreachRouter.post("/outreach/send/:id", async (req: Request, res: Response): Promise<void> => {
+outreachRouter.post("/outreach/send/:id", requireSendAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params as { id: string };
 
@@ -300,18 +373,41 @@ outreachRouter.post("/outreach/send/:id", async (req: Request, res: Response): P
     });
 
     try {
-      await emailService.sendEmail(lead.recipientEmail, activeMessage.subject, activeMessage.body);
+      const isFollowup = activeMessage.type.startsWith("FOLLOWUP_");
+      let threadIdParam = undefined;
+      let parentMsgIdParam = undefined;
+
+      if (isFollowup) {
+        threadIdParam = lead.threadId || undefined;
+        const sentMessages = lead.messages.filter((m: any) => m.sentAt && m.gmailMessageId);
+        sentMessages.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        parentMsgIdParam = sentMessages[0]?.gmailMessageId || undefined;
+      }
+
+      const result = await gmailService.sendEmail(
+        lead.recipientEmail,
+        activeMessage.subject,
+        activeMessage.body,
+        threadIdParam,
+        parentMsgIdParam
+      );
 
       // Update message as sent
       await prisma.message.update({
         where: { id: activeMessage.id },
-        data: { sentAt: new Date() },
+        data: { 
+          sentAt: new Date(),
+          gmailMessageId: result.gmailMessageId
+        },
       });
 
-      // Update lead status to SENT or the specific follow-up stage
+      // Update lead status and threadId
       await prisma.lead.update({
         where: { id: lead.id },
-        data: { status: "SENT" },
+        data: { 
+          status: "SENT",
+          threadId: result.threadId
+        },
       });
 
       res.status(200).json({ success: true, message: "Email sent successfully." });
@@ -321,7 +417,7 @@ outreachRouter.post("/outreach/send/:id", async (req: Request, res: Response): P
         where: { id: lead.id },
         data: { status: "FAILED" },
       });
-      res.status(500).json({ success: false, message: "SMTP Transmission failed.", error: String(err) });
+      res.status(500).json({ success: false, message: "Gmail transmission failed.", error: String(err) });
     }
   } catch (error) {
     console.error("[Outreach Router] Error during single send:", error);
@@ -333,7 +429,7 @@ outreachRouter.post("/outreach/send/:id", async (req: Request, res: Response): P
  * 7. Send All READY Initial Emails Sequentially
  * POST /outreach/send-all
  */
-outreachRouter.post("/outreach/send-all", async (req: Request, res: Response): Promise<void> => {
+outreachRouter.post("/outreach/send-all", requireSendAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     // Find all leads whose status is READY, and who have an unsent INITIAL email message
     const leads = await prisma.lead.findMany({
@@ -381,19 +477,25 @@ outreachRouter.post("/outreach/send-all", async (req: Request, res: Response): P
             data: { status: "SENDING" },
           });
 
-          // Transmit email
-          await emailService.sendEmail(lead.recipientEmail, message.subject, message.body);
+          // Transmit email via Gmail API
+          const result = await gmailService.sendEmail(lead.recipientEmail, message.subject, message.body);
 
           // Mark message as sent
           await prisma.message.update({
             where: { id: message.id },
-            data: { sentAt: new Date() },
+            data: { 
+              sentAt: new Date(),
+              gmailMessageId: result.gmailMessageId
+            },
           });
 
-          // Mark lead as SENT
+          // Mark lead as SENT and store threadId
           await prisma.lead.update({
             where: { id: lead.id },
-            data: { status: "SENT" },
+            data: { 
+              status: "SENT",
+              threadId: result.threadId
+            },
           });
         } catch (err) {
           console.error(`[Outreach Router] Sequential send failed for ${lead.companyName}:`, err);
@@ -520,7 +622,7 @@ outreachRouter.post("/outreach/followups/generate", async (req: Request, res: Re
  * 9. Send Selected Unsent Follow-up Emails
  * POST /outreach/followups/send
  */
-outreachRouter.post("/outreach/followups/send", async (req: Request, res: Response): Promise<void> => {
+outreachRouter.post("/outreach/followups/send", requireSendAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const { leadIds } = req.body;
 
@@ -570,16 +672,34 @@ outreachRouter.post("/outreach/followups/send", async (req: Request, res: Respon
             data: { status: "SENDING" },
           });
 
-          await emailService.sendEmail(lead.recipientEmail, message.subject, message.body);
+          // Threading parameters
+          const threadIdParam = lead.threadId || undefined;
+          const sentMessages = lead.messages.filter((m: any) => m.sentAt && m.gmailMessageId);
+          sentMessages.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          const parentMsgIdParam = sentMessages[0]?.gmailMessageId || undefined;
+
+          const result = await gmailService.sendEmail(
+            lead.recipientEmail,
+            message.subject,
+            message.body,
+            threadIdParam,
+            parentMsgIdParam
+          );
 
           await prisma.message.update({
             where: { id: message.id },
-            data: { sentAt: new Date() },
+            data: { 
+              sentAt: new Date(),
+              gmailMessageId: result.gmailMessageId
+            },
           });
 
           await prisma.lead.update({
             where: { id: lead.id },
-            data: { status: "SENT" },
+            data: { 
+              status: "SENT",
+              threadId: result.threadId
+            },
           });
         } catch (err) {
           console.error(`[Outreach Router] Sequential send failed for followup at ${lead.companyName}:`, err);

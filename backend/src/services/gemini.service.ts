@@ -81,7 +81,7 @@ export class GeminiService {
 
     console.log("[Gemini Service] Cache missing. Fetching master resume to extract skills and projects...");
     const resumeData = await this.resumeFetcher.fetchMasterResume();
-    
+
     if (!this.openai) {
       throw new Error("Gemini API is not initialized. Cannot extract resume parameters.");
     }
@@ -321,6 +321,85 @@ STRICT RULES:
     const rawResponse = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     return this.parseJsonResponse<{ companyName: string; recipientEmail: string; jobDescription: string }>(rawResponse);
+  }
+
+  /**
+   * Extracts profile details (name, role, company, linkedinUrl, and notes) from an uploaded file (PDF or image) of a profile or resume.
+   * @param base64Data The base64-encoded string of the file
+   * @param mimeType The MIME type of the file (e.g. application/pdf, image/png, image/jpeg)
+   */
+  async extractProfileFromFile(
+    base64Data: string,
+    mimeType: string
+  ): Promise<{ name: string; role: string; company: string; linkedinUrl: string; notes: string }> {
+    const systemPrompt = `You are an expert recruitment assistant.
+Analyze the provided document (which could be a PDF or image of a resume, CV, or LinkedIn profile).
+Extract the personal/professional profile details as accurately as possible.
+
+STRICT RULES:
+1. Extract the "name" of the person (default to "" if absolutely not found).
+2. Extract their primary "role" or headline (e.g. Backend Engineer, Recruiter, Founder - default to "" if not found).
+3. Extract their current or most recent "company" (e.g. Stripe, Klimb - default to "" if not found).
+4. Extract their "linkedinUrl" (e.g. https://www.linkedin.com/in/username - if mentioned in the document, extract it completely and cleanly. Default to "" if not found).
+5. Extract a brief summary of top skills, achievements, or experience as "notes" to serve as context for outreach (maximum 3-4 sentences. Default to "" if not found).
+6. Output MUST be a valid JSON object with EXACTLY five fields:
+{
+  "name": "...",
+  "role": "...",
+  "company": "...",
+  "linkedinUrl": "...",
+  "notes": "..."
+}
+7. Do NOT include any markdown or text around the JSON object.`;
+
+    if (!this.geminiApiKey) {
+      throw new Error("Gemini API Key is not set. Please configure GEMINI_API_KEY in your environment.");
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.geminiApiKey}`;
+
+    const body = {
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: `${systemPrompt}\n\nPlease extract the profile details from this document.`
+            },
+            {
+              inlineData: {
+                mimeType,
+                data: base64Data
+              }
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.1
+      }
+    };
+
+    console.log("[Gemini Service] Making native Gemini REST API call for profile file extraction...");
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error("[Gemini Service] Native API error response:", errorText);
+      throw new Error(`Gemini API returned status ${res.status}: ${errorText}`);
+    }
+
+    const json = await res.json() as any;
+    const rawResponse = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    return this.parseJsonResponse<{ name: string; role: string; company: string; linkedinUrl: string; notes: string }>(rawResponse);
   }
 
   /**

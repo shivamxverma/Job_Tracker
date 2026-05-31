@@ -79,6 +79,7 @@ model Lead {
   recipientEmail String    @map("recipient_email")
   jobDescription String    @map("job_description")
   status         String    @default("READY") // READY, SENDING, SENT, FAILED
+  threadId       String?   @map("thread_id")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
   messages       Message[]
@@ -87,13 +88,14 @@ model Lead {
 }
 
 model Message {
-  id        String    @id @default(cuid())
-  leadId    String    @map("lead_id")
-  type      String    // INITIAL, FOLLOWUP_1, FOLLOWUP_2, FOLLOWUP_3
-  subject   String
-  body      String
-  sentAt    DateTime? @map("sent_at")
-  createdAt DateTime  @default(now()) @map("created_at")
+  id             String    @id @default(cuid())
+  leadId         String    @map("lead_id")
+  type           String    // INITIAL, FOLLOWUP_1, FOLLOWUP_2, FOLLOWUP_3
+  subject        String
+  body           String
+  gmailMessageId String?   @map("gmail_message_id")
+  sentAt         DateTime? @map("sent_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
 
   lead      Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
@@ -199,5 +201,15 @@ model ConversationTracker {
   profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@map("conversation_trackers")
+}
+
+model GoogleToken {
+  id           String   @id @default("singleton")
+  accessToken  String   @map("access_token")
+  refreshToken String   @map("refresh_token")
+  expiryDate   DateTime @map("expiry_date")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("google_tokens")
 }
 

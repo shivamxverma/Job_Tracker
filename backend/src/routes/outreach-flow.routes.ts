@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../services/prisma.js";
-import { requireAuth } from "./auth.middleware.js";
+import { requireAuth, requireSendAuth } from "./auth.middleware.js";
 import { outreachQueue } from "../queues/queue.js";
 import { EmailService } from "../services/email.service.js";
 import { GeminiService } from "../services/gemini.service.js";
@@ -483,7 +483,7 @@ outreachFlowRouter.get("/outreach-flow/messages", async (req: Request, res: Resp
 });
 
 // Send Approved emails sequentially with SMTP rate limits
-outreachFlowRouter.post("/outreach-flow/outbox/send", async (req: Request, res: Response): Promise<void> => {
+outreachFlowRouter.post("/outreach-flow/outbox/send", requireSendAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const messages = await prisma.outboundMessage.findMany({
       where: {

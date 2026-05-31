@@ -7,6 +7,8 @@ import { applyWorker } from "./queues/apply.worker.js";
 import { outreachWorker } from "./queues/outreach.worker.js";
 import { outreachRouter } from "./routes/outreach.routes.js";
 import { outreachFlowRouter } from "./routes/outreach-flow.routes.js";
+import { coldMailRouter } from "./routes/cold-mail.routes.js";
+import { linkedinOutreachRouter } from "./routes/linkedin-outreach.routes.js";
 import { requireAuth } from "./routes/auth.middleware.js";
 
 
@@ -17,7 +19,7 @@ const PORT = process.env.PORT || 3000;
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key, bypass-tunnel-reminder");
   res.setHeader("Access-Control-Allow-Private-Network", "true");
   if (req.method === "OPTIONS") {
     res.sendStatus(200);
@@ -35,6 +37,8 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(outreachRouter);
 app.use(outreachFlowRouter);
+app.use(coldMailRouter);
+app.use(linkedinOutreachRouter);
 
 
 /**

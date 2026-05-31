@@ -77,7 +77,7 @@ export async function validateLinkedinSession(): Promise<boolean> {
 
   const sessionPath = getLinkedinSessionPath();
 
-  // Check cookie expiry from the session file
+  // Check cookie expiry from the session file locally to avoid aggressive headless bot detection triggers
   try {
     const sessionData = JSON.parse(fs.readFileSync(sessionPath, "utf-8"));
     const cookies = sessionData.cookies || [];
@@ -96,36 +96,10 @@ export async function validateLinkedinSession(): Promise<boolean> {
       return false;
     }
 
-    // Live validation: open LinkedIn and check for redirect
-    console.log("[LinkedIn Session] Performing live session validation...");
-    const { browser, context } = await launchStealthBrowser({
-      headless: true,
-      sessionStatePath: sessionPath,
-    });
-
-    try {
-      const page = await context.newPage();
-      await page.goto("https://www.linkedin.com/feed/", {
-        waitUntil: "domcontentloaded",
-        timeout: 30000,
-      });
-
-      await page.waitForTimeout(3000);
-
-      const currentUrl = page.url();
-      if (isBlockedPage(currentUrl)) {
-        console.warn(`[LinkedIn Session] Session invalid — redirected to: ${currentUrl}`);
-        return false;
-      }
-
-      console.log("[LinkedIn Session] Session is valid and active.");
-      return true;
-    } finally {
-      await context.close();
-      await browser.close();
-    }
+    console.log("[LinkedIn Session] Session is valid and active (local verification passed).");
+    return true;
   } catch (error) {
-    console.error("[LinkedIn Session] Validation error:", error);
+    console.error("[LinkedIn Session] Local validation error:", error);
     return false;
   }
 }

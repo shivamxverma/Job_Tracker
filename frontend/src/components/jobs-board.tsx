@@ -5,6 +5,9 @@ import { useMemo, useState, useEffect } from "react";
 import { JobCard, getStatusStyle } from "@/components/job-card";
 import type { Job } from "@/types/job";
 import { OutreachBoard } from "@/components/outreach-board";
+import { GmailOutreach } from "@/components/gmail-outreach";
+import { ColdMailerBoard } from "@/components/cold-mailer-board";
+import { LinkedinOutreach } from "@/components/linkedin-outreach";
 
 interface ResumeVersion {
   id: string;
@@ -30,8 +33,8 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
   // Main reactive database state
   const [allJobs, setAllJobs] = useState<Job[]>(initialJobs);
 
-  // Layout Tab State: "explore", "tracker", "queue", or "outreach"
-  const [activeTab, setActiveTab] = useState<"explore" | "tracker" | "queue" | "outreach">("explore");
+  // Layout Tab State: "explore", "tracker", "queue", "outreach", "coldmailer", or "linkedin"
+  const [activeTab, setActiveTab] = useState<"explore" | "tracker" | "queue" | "outreach" | "coldmailer" | "linkedin">("explore");
 
   // Search & Filter state for Explore
   const [query, setQuery] = useState("");
@@ -417,10 +420,31 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
           onClick={() => setActiveTab("outreach")}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-            <polyline points="22,6 12,13 2,6" />
+            <path d="M22 2L11 13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
           </svg>
-          Outreach Manager
+          Gmail Outreach
+        </button>
+        <button
+          className={`board-tab-btn ${activeTab === "coldmailer" ? "active" : ""}`}
+          onClick={() => setActiveTab("coldmailer")}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M22 2L11 13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
+          Cold Mailer
+        </button>
+        <button
+          className={`board-tab-btn ${activeTab === "linkedin" ? "active" : ""}`}
+          onClick={() => setActiveTab("linkedin")}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
+            <rect x="2" y="9" width="4" height="12" />
+            <circle cx="4" cy="4" r="2" />
+          </svg>
+          LinkedIn Outreach
         </button>
       </nav>
 
@@ -952,9 +976,19 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
         </section>
       )}
 
-      {/* ==================== OUTREACH MANAGER TAB ==================== */}
+      {/* ==================== GMAIL COLD OUTREACH TAB ==================== */}
       {activeTab === "outreach" && (
-        <OutreachBoard />
+        <GmailOutreach />
+      )}
+
+      {/* ==================== COLD MAILER TAB ==================== */}
+      {activeTab === "coldmailer" && (
+        <ColdMailerBoard />
+      )}
+
+      {/* ==================== LINKEDIN OUTREACH TAB ==================== */}
+      {activeTab === "linkedin" && (
+        <LinkedinOutreach />
       )}
 
       {/* ==================== SCRAPED JOB TRACK MODAL ==================== */}
