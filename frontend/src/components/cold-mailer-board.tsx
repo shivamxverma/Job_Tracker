@@ -52,7 +52,6 @@ export function ColdMailerBoard() {
 
   // 2. Campaign State
   const [importText, setImportText] = useState("");
-  const [importFormat, setImportFormat] = useState<"auto" | "csv" | "json" | "txt">("auto");
   const [parsedRecipients, setParsedRecipients] = useState<ParsedRecipient[]>([]);
   const [campaignSubjectTemplate, setCampaignSubjectTemplate] = useState("Quick question, {name}!");
   const [campaignBodyTemplate, setCampaignBodyTemplate] = useState("Hello {name},\n\nI saw your work at {company} and wanted to reach out. I'm a CSE student with strong experience in AI backend engineering.\n\nWould you be open to a quick chat?\n\nBest regards,\nShivam");
@@ -135,7 +134,7 @@ export function ColdMailerBoard() {
       } else {
         setSingleStatus({ type: "error", message: json.message || "Failed to dispatch email." });
       }
-    } catch (err) {
+    } catch {
       setSingleStatus({ type: "error", message: "Network error. Make sure your backend server is active." });
     } finally {
       setLoading(false);
@@ -146,7 +145,7 @@ export function ColdMailerBoard() {
   const handleParseImport = () => {
     if (!importText.trim()) return;
 
-    let list: any[] = [];
+    let list: ParsedRecipient[] = [];
     const text = importText.trim();
 
     try {
@@ -154,7 +153,7 @@ export function ColdMailerBoard() {
       if (text.startsWith("[") && text.endsWith("]")) {
         const json = JSON.parse(text);
         if (Array.isArray(json)) {
-          list = json.map((item: any, idx) => ({
+          list = json.map((item: { email?: string; recipientEmail?: string; name?: string; recipientName?: string; company?: string; companyName?: string }, idx) => ({
             id: `json-${idx}-${Date.now()}`,
             email: item.email || item.recipientEmail || "",
             name: item.name || item.recipientName || "Hiring Manager",
@@ -163,7 +162,7 @@ export function ColdMailerBoard() {
           }));
         }
       }
-    } catch (e) {
+    } catch {
       // Parsing JSON failed, fallback to CSV or TXT
     }
 
@@ -288,7 +287,7 @@ export function ColdMailerBoard() {
           );
           setCampaignLogs((prev) => [...prev, `[${timestamp}] Failed to send to ${recipient.email} ❌ (Error: ${json.message || "Unknown error"})`]);
         }
-      } catch (err) {
+      } catch {
         setParsedRecipients((prev) =>
           prev.map((r) =>
             r.id === recipient.id ? { ...r, status: "error", errorDetails: "Network error" } : r
