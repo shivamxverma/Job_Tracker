@@ -72,3 +72,31 @@ model ResumeVersion {
   @@index([applicationId])
   @@index([jobId])
 }
+
+model Lead {
+  id             String    @id @default(cuid())
+  companyName    String    @map("company_name")
+  recipientEmail String    @map("recipient_email")
+  jobDescription String    @map("job_description")
+  status         String    @default("READY") // READY, SENDING, SENT, FAILED
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  messages       Message[]
+
+  @@map("leads")
+}
+
+model Message {
+  id        String    @id @default(cuid())
+  leadId    String    @map("lead_id")
+  type      String    // INITIAL, FOLLOWUP_1, FOLLOWUP_2, FOLLOWUP_3
+  subject   String
+  body      String
+  sentAt    DateTime? @map("sent_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  lead      Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+

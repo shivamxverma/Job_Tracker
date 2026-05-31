@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 
 import { JobCard, getStatusStyle } from "@/components/job-card";
 import type { Job } from "@/types/job";
+import { OutreachBoard } from "@/components/outreach-board";
 
 interface ResumeVersion {
   id: string;
@@ -29,8 +30,8 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
   // Main reactive database state
   const [allJobs, setAllJobs] = useState<Job[]>(initialJobs);
 
-  // Layout Tab State: "explore", "tracker", or "queue"
-  const [activeTab, setActiveTab] = useState<"explore" | "tracker" | "queue">("explore");
+  // Layout Tab State: "explore", "tracker", "queue", or "outreach"
+  const [activeTab, setActiveTab] = useState<"explore" | "tracker" | "queue" | "outreach">("explore");
 
   // Search & Filter state for Explore
   const [query, setQuery] = useState("");
@@ -410,6 +411,16 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
             <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
           </svg>
           Application Tracker
+        </button>
+        <button
+          className={`board-tab-btn ${activeTab === "outreach" ? "active" : ""}`}
+          onClick={() => setActiveTab("outreach")}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+            <polyline points="22,6 12,13 2,6" />
+          </svg>
+          Outreach Manager
         </button>
       </nav>
 
@@ -939,6 +950,11 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
             </div>
           )}
         </section>
+      )}
+
+      {/* ==================== OUTREACH MANAGER TAB ==================== */}
+      {activeTab === "outreach" && (
+        <OutreachBoard />
       )}
 
       {/* ==================== SCRAPED JOB TRACK MODAL ==================== */}

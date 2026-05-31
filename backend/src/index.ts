@@ -4,11 +4,26 @@ import { startFetchScheduler, triggerFetchJob } from "./scheduler/fetch.schedule
 import { startCleanupScheduler, triggerCleanupJob } from "./scheduler/cleanup.scheduler.js";
 import { resumeWorker } from "./queues/resume.worker.js";
 import { applyWorker } from "./queues/apply.worker.js";
+import { outreachRouter } from "./routes/outreach.routes.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Enable CORS for frontend API calls
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 app.use(express.json());
+app.use(outreachRouter);
+
 
 /**
  * Health Check & Status Endpoint
