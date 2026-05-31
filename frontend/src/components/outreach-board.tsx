@@ -76,27 +76,7 @@ export function OutreachBoard() {
       ...options.headers,
     };
 
-    const res = await fetch(url, { ...options, headers });
-
-    if (res.status === 401 || res.status === 500) {
-      const clonedRes = res.clone();
-      try {
-        const json = await clonedRes.json();
-        if (
-          json.message?.toLowerCase().includes("api key") ||
-          json.message?.toLowerCase().includes("unauthorized") ||
-          json.message?.toLowerCase().includes("security error")
-        ) {
-          setShowAuthModal(true);
-          setAuthError(json.message);
-        }
-      } catch (e) {
-        setShowAuthModal(true);
-        setAuthError("Unauthorized access or missing server key configuration.");
-      }
-    }
-
-    return res;
+    return await fetch(url, { ...options, headers });
   };
 
   const handleAuthSubmit = (e: React.FormEvent) => {

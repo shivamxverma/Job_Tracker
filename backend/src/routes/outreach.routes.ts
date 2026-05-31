@@ -100,7 +100,11 @@ outreachRouter.post("/outreach/leads/extract-image", async (req: Request, res: R
     });
   } catch (error) {
     console.error("[Outreach Router] Error extracting lead from image:", error);
-    res.status(500).json({ success: false, error: String(error) });
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : String(error),
+      error: String(error),
+    });
   }
 });
 

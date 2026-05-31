@@ -12,9 +12,11 @@ export class GeminiService {
   private openai: OpenAI | null = null;
   private resumeFetcher: ResumeFetcherService;
   private storageDir: string;
+  private geminiApiKey: string | undefined;
 
   constructor() {
     const geminiApiKey = process.env.GEMINI_API_KEY;
+    this.geminiApiKey = geminiApiKey;
     this.resumeFetcher = new ResumeFetcherService();
     this.storageDir = path.resolve(process.cwd(), "storage");
 
@@ -271,29 +273,52 @@ STRICT RULES:
 }
 5. Do NOT include any markdown or text around the JSON object.`;
 
-    const rawResponse = await this.safeCall(async () => {
-      const response = await this.openai!.chat.completions.create({
-        model: "gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Please extract the recruiter lead details from this image." },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mimeType};base64,${base64Image}`,
-                },
-              },
-            ],
-          },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.1,
-      });
-      return response.choices[0]?.message?.content || "";
+    if (!this.geminiApiKey) {
+      throw new Error("Gemini API Key is not set. Please configure GEMINI_API_KEY in your environment.");
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.geminiApiKey}`;
+
+    const body = {
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: `${systemPrompt}\n\nPlease extract the recruiter lead details from this image.`
+            },
+            {
+              inlineData: {
+                mimeType,
+                data: base64Image
+              }
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.1
+      }
+    };
+
+    console.log("[Gemini Service] Making native Gemini REST API call for lead image extraction...");
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
     });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error("[Gemini Service] Native API error response:", errorText);
+      throw new Error(`Gemini API returned status ${res.status}: ${errorText}`);
+    }
+
+    const json = await res.json() as any;
+    const rawResponse = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     return this.parseJsonResponse<{ companyName: string; recipientEmail: string; jobDescription: string }>(rawResponse);
   }
