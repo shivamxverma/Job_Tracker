@@ -201,7 +201,7 @@ export function OutreachBoard() {
       setIsAuthenticated(true);
       setPasscodeInput("");
       loadAllData();
-    } catch (err) {
+    } catch {
       setAuthError("Network error. Verify that your backend server is running.");
     } finally {
       setLoading(false);
@@ -289,7 +289,7 @@ export function OutreachBoard() {
 
   useEffect(() => {
     loadAllData();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll queues and outbox every 4 seconds to observe real-time BullMQ & SMTP updates
   useEffect(() => {
@@ -317,7 +317,7 @@ export function OutreachBoard() {
       }, 4000);
       return () => clearInterval(interval);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ==================== A. ADD ENTITIES HANDLERS ====================
 
@@ -407,7 +407,7 @@ export function OutreachBoard() {
         } else {
           alert("Failed to import: " + json.message);
         }
-      } catch (err) {
+      } catch {
         alert("Parser error. Verify JSON formatting or CSV headers (Name,Role,Company).");
       } finally {
         setLoading(false);
@@ -942,7 +942,7 @@ export function OutreachBoard() {
           return (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key as any)}
+              onClick={() => setActiveTab(tab.key as "analytics" | "profiles" | "resumes" | "jobs" | "templates" | "generation" | "outbox")}
               style={{
                 flex: "1 1 auto",
                 padding: "0.65rem 1rem",
@@ -1529,7 +1529,7 @@ export function OutreachBoard() {
 
           {genQueueJobs.length === 0 ? (
             <div style={{ padding: "4rem", textAlign: "center", background: "#f8fafc", border: "1px dashed var(--border)", borderRadius: "16px" }}>
-              No background jobs enqueued. Go to the "Target Profiles" tab, select profiles, and dispatch generations.
+              No background jobs enqueued. Go to the &quot;Target Profiles&quot; tab, select profiles, and dispatch generations.
             </div>
           ) : (
             <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: "16px", overflow: "hidden", boxShadow: "var(--shadow)" }}>
