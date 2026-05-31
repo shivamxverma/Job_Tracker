@@ -28,6 +28,9 @@ export function OutreachBoard() {
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
   // Modal State
   const [showAddModal, setShowAddModal] = useState(false);
   const [addMode, setAddMode] = useState<"single" | "bulk" | "image">("single");
@@ -79,28 +82,63 @@ export function OutreachBoard() {
     return await fetch(url, { ...options, headers });
   };
 
-  const handleAuthSubmit = (e: React.FormEvent) => {
+  // Real-time verification on submit
+  const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passcodeInput.trim()) {
       setAuthError("Passcode cannot be empty.");
       return;
     }
-    localStorage.setItem("outreach_api_key", passcodeInput.trim());
-    setShowAuthModal(false);
+    
+    setLoading(true);
     setAuthError("");
-    // Instantly trigger leads refetch on successful login
-    setTimeout(() => {
-      fetchLeads();
-    }, 100);
+    try {
+      const testKey = passcodeInput.trim();
+      const res = await fetch(`${API_BASE}/outreach/leads`, {
+        headers: {
+          "X-API-Key": testKey,
+        },
+      });
+      
+      if (res.status === 401) {
+        setAuthError("Invalid passcode. Access Denied.");
+        setLoading(false);
+        return;
+      }
+      
+      localStorage.setItem("outreach_api_key", testKey);
+      setIsAuthenticated(true);
+      setPasscodeInput("");
+      // Fetch data immediately
+      const json = await res.json();
+      if (json.success) {
+        setLeads(json.data);
+      }
+    } catch (err) {
+      setAuthError("Network error. Verify that the backend server is running.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignOut = () => {
+    localStorage.removeItem("outreach_api_key");
+    setIsAuthenticated(false);
+    setLeads([]);
   };
 
   // Fetch all leads from Express backend
   const fetchLeads = async () => {
     try {
       const res = await fetchWithAuth(`${API_BASE}/outreach/leads`);
+      if (res.status === 401) {
+        setIsAuthenticated(false);
+        return;
+      }
       const json = await res.json();
       if (json.success) {
         setLeads(json.data);
+        setIsAuthenticated(true);
       }
     } catch (err) {
       console.error("[OutreachBoard] Failed to fetch leads:", err);
@@ -493,6 +531,199 @@ export function OutreachBoard() {
     }
   };
 
+  if (isAuthenticated === null) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "65vh" }}>
+        <div className="spinner" style={{
+          width: "40px",
+          height: "40px",
+          border: "4px solid rgba(79, 70, 229, 0.1)",
+          borderTopColor: "#4f46e5",
+          borderRadius: "50%",
+          animation: "spin 1s linear infinite"
+        }} />
+        <p style={{ marginTop: "1rem", color: "#64748b", fontWeight: 500 }}>Verifying connection...</p>
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div 
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "65vh",
+          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%)",
+          borderRadius: "24px",
+          padding: "3rem 1.5rem",
+          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3)",
+          position: "relative",
+          overflow: "hidden"
+        }}
+      >
+        {/* Glow Spheres */}
+        <div style={{ position: "absolute", top: "-10%", left: "-10%", width: "300px", height: "300px", background: "radial-gradient(circle, rgba(99,102,241,0.15) 0%, rgba(0,0,0,0) 70%)", borderRadius: "50%" }} />
+        <div style={{ position: "absolute", bottom: "-10%", right: "-10%", width: "300px", height: "300px", background: "radial-gradient(circle, rgba(168,85,247,0.15) 0%, rgba(0,0,0,0) 70%)", borderRadius: "50%" }} />
+
+        <div 
+          style={{
+            width: "100%",
+            maxWidth: "420px",
+            background: "rgba(255, 255, 255, 0.07)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: "1px solid rgba(255, 255, 255, 0.15)",
+            borderRadius: "24px",
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+            padding: "2.5rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "1.75rem",
+            zIndex: 10,
+            animation: "fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)"
+          }}
+        >
+          <div style={{ textAlign: "center" }}>
+            <div style={{ 
+              fontSize: "3rem", 
+              marginBottom: "0.75rem",
+              animation: "pulseLock 2s infinite alternate" 
+            }}>
+              🔒
+            </div>
+            <h3 style={{ fontSize: "1.6rem", fontWeight: 700, color: "#ffffff", margin: 0, letterSpacing: "-0.025em" }}>Secure Outreach</h3>
+            <p style={{ fontSize: "0.88rem", color: "#94a3b8", marginTop: "0.5rem", lineHeight: 1.5 }}>
+              A secure passcode is required to send emails, manage recruiters, and run Gemini automation.
+            </p>
+          </div>
+
+          <form onSubmit={handleAuthSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <div>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Enter Passcode
+              </label>
+              <div style={{ display: "flex", position: "relative" }}>
+                <input
+                  type={showPasscodeText ? "text" : "password"}
+                  placeholder="••••••••••••"
+                  value={passcodeInput}
+                  onChange={(e) => setPasscodeInput(e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: "100%",
+                    padding: "0.8rem 2.8rem 0.8rem 1rem",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    color: "#ffffff",
+                    fontSize: "1rem",
+                    outline: "none",
+                    transition: "all 150ms ease",
+                    boxShadow: "inset 0 2px 4px rgba(0, 0, 0, 0.2)"
+                  }}
+                  className="auth-input"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasscodeText(!showPasscodeText)}
+                  style={{
+                    position: "absolute",
+                    right: "12px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "1.2rem",
+                    color: "#94a3b8",
+                    padding: "4px",
+                  }}
+                  title={showPasscodeText ? "Hide passcode" : "Show passcode"}
+                >
+                  {showPasscodeText ? "👁️" : "👁️‍🗨️"}
+                </button>
+              </div>
+            </div>
+
+            {authError && (
+              <div 
+                style={{ 
+                  color: "#f87171", 
+                  fontSize: "0.85rem", 
+                  fontWeight: 500,
+                  background: "rgba(239, 68, 68, 0.1)",
+                  padding: "0.75rem 1rem",
+                  borderRadius: "10px",
+                  border: "1px solid rgba(239, 68, 68, 0.2)",
+                  lineHeight: 1.4,
+                  animation: "shake 0.4s ease-in-out"
+                }}
+              >
+                ⚠️ {authError}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: "100%",
+                padding: "0.85rem",
+                background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+                color: "white",
+                border: "none",
+                borderRadius: "12px",
+                fontSize: "0.98rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                boxShadow: "0 8px 20px -4px rgba(79, 70, 229, 0.4)",
+                transition: "all 150ms cubic-bezier(0.4, 0, 0.2, 1)",
+                opacity: loading ? 0.7 : 1
+              }}
+            >
+              {loading ? "Verifying..." : "Authenticate Session 🚀"}
+            </button>
+          </form>
+        </div>
+
+        {/* Global Keyframes styling */}
+        <style>{`
+          @keyframes fadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          @keyframes pulseLock {
+            from { transform: scale(1); }
+            to { transform: scale(1.08); }
+          }
+          @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-6px); }
+            75% { transform: translateX(6px); }
+          }
+          .auth-input:focus {
+            border-color: #6366f1 !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25) !important;
+            background: rgba(255, 255, 255, 0.08) !important;
+          }
+        `}</style>
+      </div>
+    );
+  }
+
   return (
     <div className="tracker-section" style={{ minHeight: "65vh" }}>
       {/* 1. Metrics Counter Dashboard */}
@@ -546,6 +777,29 @@ export function OutreachBoard() {
         </div>
 
         <div className="tracker-toolbar-right" style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+          {/* Lock Session Button */}
+          <button
+            onClick={handleSignOut}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              minHeight: "42px",
+              padding: "0.5rem 1rem",
+              background: "#fee2e2",
+              color: "#dc2626",
+              border: "1px solid #fecaca",
+              borderRadius: "10px",
+              fontSize: "0.9rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "all 150ms ease",
+            }}
+            title="Lock Session / Sign Out"
+          >
+            🔒 Lock Session
+          </button>
+
           {/* Search Box */}
           <div className="tracker-search-box">
             <input
