@@ -2,65 +2,162 @@
 
 import { useState, useEffect, useMemo } from "react";
 
-interface Message {
+interface MessageDraft {
   id: string;
-  leadId: string;
-  type: string; // INITIAL, FOLLOWUP_1, FOLLOWUP_2, FOLLOWUP_3
+  profileId: string;
+  channel: string;
   subject: string;
-  body: string;
+  content: string;
+  status: string; // DRAFT, APPROVED, REJECTED, EDITED, SENT, FAILED
   sentAt: string | null;
+  profile: Profile;
+}
+
+interface Profile {
+  id: string;
+  name: string;
+  role: string;
+  company: string;
+  linkedinUrl: string | null;
+  email: string | null;
+  notes: string | null;
+  source: string;
+  tags: string[];
+  createdAt: string;
+  outboundMessages?: MessageDraft[];
+}
+
+interface Resume {
+  id: string;
+  title: string;
+  parsedText: string;
+  skills: string[];
   createdAt: string;
 }
 
-interface Lead {
+interface ManualJob {
   id: string;
-  companyName: string;
-  recipientEmail: string;
-  jobDescription: string;
-  status: string; // READY, SENDING, SENT, FAILED
+  title: string;
+  company: string;
+  description: string | null;
+  applyUrl: string | null;
+  platform: string;
+}
+
+interface PromptTemplate {
+  id: string;
+  name: string;
+  type: string; // REFERRAL, NETWORKING, FEEDBACK, FOUNDER
+  prompt: string;
+  active: boolean;
+}
+
+interface GenQueueJob {
+  id: string;
+  profileId: string;
+  status: string; // PENDING, GENERATING, COMPLETED, FAILED
+  generatedSubject: string | null;
+  generatedMessage: string | null;
+  error: string | null;
   createdAt: string;
-  updatedAt: string;
-  messages: Message[];
+  profile: Profile;
+  template: PromptTemplate;
+}
+
+interface AnalyticsStats {
+  totalProfiles: number;
+  totalGenerated: number;
+  approvedCount: number;
+  sentCount: number;
+  failedCount: number;
+  repliesCount: number;
+  positiveReplies: number;
+  replyRate: number;
+  positiveReplyRate: number;
+  referralsReceived: number;
+  interviewsScheduled: number;
 }
 
 export function OutreachBoard() {
-  const [leads, setLeads] = useState<Lead[]>([]);
+  // Navigation tabs
+  const [activeTab, setActiveTab] = useState<"analytics" | "profiles" | "resumes" | "jobs" | "templates" | "generation" | "outbox">("analytics");
+
+  // Core Entity States
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [manualJobs, setManualJobs] = useState<ManualJob[]>([]);
+  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
+  const [genQueueJobs, setGenQueueJobs] = useState<GenQueueJob[]>([]);
+  const [approvalQueue, setApprovalQueue] = useState<MessageDraft[]>([]);
+  const [outboxMessages, setOutboxMessages] = useState<MessageDraft[]>([]);
+  
+  // Analytics
+  const [stats, setStats] = useState<AnalyticsStats>({
+    totalProfiles: 0,
+    totalGenerated: 0,
+    approvedCount: 0,
+    sentCount: 0,
+    failedCount: 0,
+    repliesCount: 0,
+    positiveReplies: 0,
+    replyRate: 0,
+    positiveReplyRate: 0,
+    referralsReceived: 0,
+    interviewsScheduled: 0,
+  });
+
+  // UI / Form States
   const [loading, setLoading] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedProfileIds, setSelectedProfileIds] = useState<Set<string>>(new Set());
+  const [activeResumeId, setActiveResumeId] = useState<string>("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [selectedJobId, setSelectedJobId] = useState<string>("");
 
-  // Authentication State
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  // Drawer & Modal States
+  const [showAddProfileModal, setShowAddProfileModal] = useState(false);
+  const [showAddResumeModal, setShowAddResumeModal] = useState(false);
+  const [showAddJobModal, setShowAddJobModal] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
 
-  // Modal State
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [addMode, setAddMode] = useState<"single" | "bulk" | "image">("single");
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  // Form inputs
+  const [profileName, setProfileName] = useState("");
+  const [profileRole, setProfileRole] = useState("");
+  const [profileCompany, setProfileCompany] = useState("");
+  const [profileLinkedin, setProfileLinkedin] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profileNotes, setProfileNotes] = useState("");
+  const [profileTagsInput, setProfileTagsInput] = useState("");
+  const [profileBulkInput, setProfileBulkInput] = useState("");
+  const [importFormat, setImportFormat] = useState<"csv" | "json">("csv");
+
+  const [resumeTitle, setResumeTitle] = useState("");
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+
+  const [jobTitleInput, setJobTitleInput] = useState("");
+  const [jobCompanyInput, setJobCompanyInput] = useState("");
+  const [jobDescriptionInput, setJobDescriptionInput] = useState("");
+  const [jobLinkInput, setJobLinkInput] = useState("");
+
+  const [templateName, setTemplateName] = useState("");
+  const [templateType, setTemplateType] = useState("REFERRAL");
+  const [templatePrompt, setTemplatePrompt] = useState("");
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+
+  // Editing approval queue draft inline
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
+  const [editingSubject, setEditingSubject] = useState("");
+  const [editingContent, setEditingContent] = useState("");
+
+  // Search & filter
+  const [profileSearchQuery, setProfileSearchQuery] = useState("");
+  const [profileFilterCompany, setProfileFilterCompany] = useState("");
 
   // Passcode Authentication State
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [passcodeInput, setPasscodeInput] = useState("");
   const [authError, setAuthError] = useState("");
   const [showPasscodeText, setShowPasscodeText] = useState(false);
 
-  // Image Upload Form
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [extractingImage, setExtractingImage] = useState(false);
-
-  // Single Lead Input Form
-  const [companyName, setCompanyName] = useState("");
-  const [recipientEmail, setRecipientEmail] = useState("");
-  const [jobDescription, setJobDescription] = useState("");
-
-  // Bulk Upload Form
-  const [bulkInput, setBulkInput] = useState("");
-  const [bulkFormat, setBulkFormat] = useState<"json" | "csv">("json");
-
-  // Search Filter
-  const [query, setQuery] = useState("");
-
-  // API base URL pointing to the Express server running on port 3000
   const API_BASE = "http://localhost:3000";
 
   // Load API key from env or localStorage
@@ -71,51 +168,41 @@ export function OutreachBoard() {
     return process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "";
   };
 
-  // Helper wrapper for making authorized backend fetch requests
+  // Wrapper for authorized backend fetches
   const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
     const key = getApiKey();
     const headers = {
       "X-API-Key": key,
       ...options.headers,
     };
-
     return await fetch(url, { ...options, headers });
   };
 
-  // Real-time verification on submit
+  // Dynamic Auth Submit Check
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passcodeInput.trim()) {
       setAuthError("Passcode cannot be empty.");
       return;
     }
-    
     setLoading(true);
     setAuthError("");
     try {
       const testKey = passcodeInput.trim();
-      const res = await fetch(`${API_BASE}/outreach/leads`, {
-        headers: {
-          "X-API-Key": testKey,
-        },
+      const res = await fetch(`${API_BASE}/outreach-flow/analytics`, {
+        headers: { "X-API-Key": testKey },
       });
-      
       if (res.status === 401) {
         setAuthError("Invalid passcode. Access Denied.");
         setLoading(false);
         return;
       }
-      
       localStorage.setItem("outreach_api_key", testKey);
       setIsAuthenticated(true);
       setPasscodeInput("");
-      // Fetch data immediately
-      const json = await res.json();
-      if (json.success) {
-        setLeads(json.data);
-      }
+      loadAllData();
     } catch (err) {
-      setAuthError("Network error. Verify that the backend server is running.");
+      setAuthError("Network error. Verify that your backend server is running.");
     } finally {
       setLoading(false);
     }
@@ -124,412 +211,503 @@ export function OutreachBoard() {
   const handleSignOut = () => {
     localStorage.removeItem("outreach_api_key");
     setIsAuthenticated(false);
-    setLeads([]);
   };
 
-  // Fetch all leads from Express backend
-  const fetchLeads = async () => {
+  // Pull All Data from API
+  const loadAllData = async () => {
+    if (getApiKey() === "") {
+      setIsAuthenticated(false);
+      return;
+    }
+
     try {
-      const res = await fetchWithAuth(`${API_BASE}/outreach/leads`);
-      if (res.status === 401) {
+      setLoading(true);
+      // 1. Fetch Analytics
+      const statsRes = await fetchWithAuth(`${API_BASE}/outreach-flow/analytics`);
+      if (statsRes.status === 401) {
         setIsAuthenticated(false);
+        setLoading(false);
         return;
       }
-      const json = await res.json();
-      if (json.success) {
-        setLeads(json.data);
-        setIsAuthenticated(true);
+      const statsJson = await statsRes.json();
+      if (statsJson.success) setStats(statsJson.data);
+
+      // 2. Fetch Profiles
+      const profRes = await fetchWithAuth(`${API_BASE}/outreach-flow/profiles`);
+      const profJson = await profRes.json();
+      if (profJson.success) setProfiles(profJson.data);
+
+      // 3. Fetch Resumes
+      const resRes = await fetchWithAuth(`${API_BASE}/outreach-flow/resumes`);
+      const resJson = await resRes.json();
+      if (resJson.success) {
+        setResumes(resJson.data);
+        if (resJson.data.length > 0 && !activeResumeId) {
+          setActiveResumeId(resJson.data[0].id);
+        }
       }
+
+      // 4. Fetch Manual Jobs
+      const jobRes = await fetchWithAuth(`${API_BASE}/outreach-flow/jobs`);
+      const jobJson = await jobRes.json();
+      if (jobJson.success) setManualJobs(jobJson.data);
+
+      // 5. Fetch Templates
+      const tempRes = await fetchWithAuth(`${API_BASE}/outreach-flow/templates`);
+      const tempJson = await tempRes.json();
+      if (tempJson.success) {
+        setTemplates(tempJson.data);
+        if (tempJson.data.length > 0 && !selectedTemplateId) {
+          setSelectedTemplateId(tempJson.data[0].id);
+        }
+      }
+
+      // 6. Fetch Generation Queue
+      const queueRes = await fetchWithAuth(`${API_BASE}/outreach-flow/queue/status`);
+      const queueJson = await queueRes.json();
+      if (queueJson.success) setGenQueueJobs(queueJson.data);
+
+      // 7. Fetch Approval Queue (DRAFT outbound messages)
+      const appRes = await fetchWithAuth(`${API_BASE}/outreach-flow/approval`);
+      const appJson = await appRes.json();
+      if (appJson.success) setApprovalQueue(appJson.data);
+
+      // 8. Fetch Outbox History
+      const messagesRes = await fetchWithAuth(`${API_flow_or_messages()}`);
+      const messagesJson = await messagesRes.json();
+      if (messagesJson.success) setOutboxMessages(messagesJson.data);
+
+      setIsAuthenticated(true);
     } catch (err) {
-      console.error("[OutreachBoard] Failed to fetch leads:", err);
+      console.error("OutreachFlow data fetching crash:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
+  const API_flow_or_messages = () => `${API_BASE}/outreach-flow/messages`;
 
   useEffect(() => {
-    fetchLeads();
-    // Poll leads every 4 seconds to observe real-time status changes when emails are sending sequentially
-    const interval = setInterval(fetchLeads, 4000);
-    return () => clearInterval(interval);
+    loadAllData();
   }, []);
 
-  // Compute Metrics
-  const metrics = useMemo(() => {
-    return {
-      total: leads.length,
-      ready: leads.filter((l) => l.status === "READY").length,
-      sending: leads.filter((l) => l.status === "SENDING").length,
-      sent: leads.filter((l) => l.status === "SENT").length,
-      failed: leads.filter((l) => l.status === "FAILED").length,
-    };
-  }, [leads]);
+  // Poll queues and outbox every 4 seconds to observe real-time BullMQ & SMTP updates
+  useEffect(() => {
+    if (isAuthenticated) {
+      const interval = setInterval(async () => {
+        try {
+          const queueRes = await fetchWithAuth(`${API_BASE}/outreach-flow/queue/status`);
+          const queueJson = await queueRes.json();
+          if (queueJson.success) setGenQueueJobs(queueJson.data);
 
-  // Handle Checkbox Selection
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
+          const appRes = await fetchWithAuth(`${API_BASE}/outreach-flow/approval`);
+          const appJson = await appRes.json();
+          if (appJson.success) setApprovalQueue(appJson.data);
+
+          const messagesRes = await fetchWithAuth(API_flow_or_messages());
+          const messagesJson = await messagesRes.json();
+          if (messagesJson.success) setOutboxMessages(messagesJson.data);
+
+          const statsRes = await fetchWithAuth(`${API_BASE}/outreach-flow/analytics`);
+          const statsJson = await statsRes.json();
+          if (statsJson.success) setStats(statsJson.data);
+        } catch (e) {
+          console.error("OutreachFlow real-time background poller failed:", e);
+        }
+      }, 4000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
+
+  // ==================== A. ADD ENTITIES HANDLERS ====================
+
+  // Upload Resume
+  const handleUploadResume = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resumeTitle || !resumeFile) {
+      alert("Please fill out resume title and select a PDF file.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(resumeFile);
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        const res = await fetchWithAuth(`${API_BASE}/outreach-flow/resumes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: resumeTitle,
+            pdfBase64: base64,
+          }),
+        });
+
+        const json = await res.json();
+        if (json.success) {
+          alert("Resume uploaded and parsed successfully!");
+          setResumeTitle("");
+          setResumeFile(null);
+          setShowAddResumeModal(false);
+          loadAllData();
+        } else {
+          alert("Upload failed: " + json.message);
+        }
+      };
+    } catch (error) {
+      console.error(error);
+      alert("Resume upload error.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add Target Profile (Single or Paste Importer)
+  const handleAddProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (profileBulkInput.trim()) {
+      // Bulk CSV/JSON import
+      setLoading(true);
+      try {
+        let listToUpload = [];
+        if (importFormat === "json") {
+          listToUpload = JSON.parse(profileBulkInput.trim());
+        } else {
+          // CSV Parser
+          const lines = profileBulkInput.trim().split("\n");
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const cols = line.split(",").map((c) => c.trim().replace(/^["']|["']$/g, ""));
+            if (cols.length >= 3) {
+              listToUpload.push({
+                name: cols[0],
+                role: cols[1],
+                company: cols[2],
+                linkedinUrl: cols[3] || null,
+                email: cols[4] || null,
+                notes: cols[5] || null,
+              });
+            }
+          }
+        }
+
+        const res = await fetchWithAuth(`${API_BASE}/outreach-flow/profiles`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profiles: listToUpload }),
+        });
+
+        const json = await res.json();
+        if (json.success) {
+          alert(`Successfully imported ${json.data.length} profiles!`);
+          setProfileBulkInput("");
+          setShowAddProfileModal(false);
+          loadAllData();
+        } else {
+          alert("Failed to import: " + json.message);
+        }
+      } catch (err) {
+        alert("Parser error. Verify JSON formatting or CSV headers (Name,Role,Company).");
+      } finally {
+        setLoading(false);
       }
+    } else {
+      // Single Add
+      if (!profileName || !profileRole || !profileCompany) {
+        alert("Name, Role, and Company are required.");
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const res = await fetchWithAuth(`${API_BASE}/outreach-flow/profiles`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            profiles: {
+              name: profileName,
+              role: profileRole,
+              company: profileCompany,
+              linkedinUrl: profileLinkedin || null,
+              email: profileEmail || null,
+              notes: profileNotes || null,
+              tags: profileTagsInput ? profileTagsInput.split(",").map((t) => t.trim()) : [],
+            },
+          }),
+        });
+
+        const json = await res.json();
+        if (json.success) {
+          setProfileName("");
+          setProfileRole("");
+          setProfileCompany("");
+          setProfileLinkedin("");
+          setProfileEmail("");
+          setProfileNotes("");
+          setProfileTagsInput("");
+          setShowAddProfileModal(false);
+          loadAllData();
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  // Add Manual Job
+  const handleAddJob = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!jobTitleInput || !jobCompanyInput) {
+      alert("Job Title and Company are required.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/outreach-flow/jobs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: jobTitleInput,
+          company: jobCompanyInput,
+          description: jobDescriptionInput || null,
+          link: jobLinkInput || null,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        setJobTitleInput("");
+        setJobCompanyInput("");
+        setJobDescriptionInput("");
+        setJobLinkInput("");
+        setShowAddJobModal(false);
+        loadAllData();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Create/Update Prompt Template
+  const handleSaveTemplate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!templateName || !templatePrompt) {
+      alert("Template name and prompt text are required.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/outreach-flow/templates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingTemplateId || undefined,
+          name: templateName,
+          type: templateType,
+          prompt: templatePrompt,
+          active: true,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        setTemplateName("");
+        setTemplatePrompt("");
+        setEditingTemplateId(null);
+        setShowTemplateModal(false);
+        loadAllData();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==================== B. BULK GENERATION DISPATCHER (BULLMQ) ====================
+
+  const handleLaunchGeneration = async () => {
+    if (selectedProfileIds.size === 0) {
+      alert("Please select at least one target profile from the list.");
+      return;
+    }
+    if (!activeResumeId) {
+      alert("Please upload and select an active resume first.");
+      return;
+    }
+    if (!selectedTemplateId) {
+      alert("Please select a prompt template to use.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/outreach-flow/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileIds: Array.from(selectedProfileIds),
+          resumeId: activeResumeId,
+          templateId: selectedTemplateId,
+          jobId: selectedJobId || null,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        alert(`Dispatched BullMQ! Enqueued ${selectedProfileIds.size} bulk generations in the Redis worker pool.`);
+        setSelectedProfileIds(new Set());
+        setActiveTab("generation");
+        loadAllData();
+      } else {
+        alert("Dispatch failed: " + json.message);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("BullMQ dispatch error.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==================== C. APPROVAL WORKFLOW HANDLERS ====================
+
+  const handleOpenEditDraft = (draft: MessageDraft) => {
+    setEditingDraftId(draft.id);
+    setEditingSubject(draft.subject);
+    setEditingContent(draft.content);
+  };
+
+  const handleSaveDraftEdits = async (id: string) => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/outreach-flow/approval/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: editingSubject,
+          content: editingContent,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        setEditingDraftId(null);
+        loadAllData();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleApproveMessage = async (id: string) => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/outreach-flow/approval/${id}/approve`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (json.success) {
+        loadAllData();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleRejectMessage = async (id: string) => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/outreach-flow/approval/${id}/reject`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (json.success) {
+        loadAllData();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Dispatch approved emails sequentially
+  const handleTriggerSMTPDispatch = async () => {
+    setLoading(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/outreach-flow/outbox/send`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      alert(json.message);
+      setActiveTab("outbox");
+      loadAllData();
+    } catch (e) {
+      console.error(e);
+      alert("SMTP outbox transmission failure.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==================== D. ENTITY DELETION HANDLERS ====================
+
+  const handleDeleteProfile = async (id: string) => {
+    if (!confirm("Delete this target profile?")) return;
+    await fetchWithAuth(`${API_BASE}/outreach-flow/profiles/${id}`, { method: "DELETE" });
+    loadAllData();
+  };
+
+  const handleDeleteResume = async (id: string) => {
+    if (!confirm("Delete this resume version?")) return;
+    await fetchWithAuth(`${API_BASE}/outreach-flow/resumes/${id}`, { method: "DELETE" });
+    loadAllData();
+  };
+
+  const handleDeleteJob = async (id: string) => {
+    if (!confirm("Delete this target job posting?")) return;
+    await fetchWithAuth(`${API_BASE}/outreach-flow/jobs/${id}`, { method: "DELETE" });
+    loadAllData();
+  };
+
+  // ==================== E. FILTER & SELECTIONS ====================
+
+  const filteredProfiles = useMemo(() => {
+    return profiles.filter((p) => {
+      const matchSearch =
+        p.name.toLowerCase().includes(profileSearchQuery.toLowerCase()) ||
+        p.role.toLowerCase().includes(profileSearchQuery.toLowerCase()) ||
+        p.company.toLowerCase().includes(profileSearchQuery.toLowerCase());
+      const matchCompany = profileFilterCompany ? p.company === profileFilterCompany : true;
+      return matchSearch && matchCompany;
+    });
+  }, [profiles, profileSearchQuery, profileFilterCompany]);
+
+  const uniqueProfileCompanies = useMemo(() => {
+    return Array.from(new Set(profiles.map((p) => p.company)));
+  }, [profiles]);
+
+  const toggleSelectProfile = (id: string) => {
+    setSelectedProfileIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
 
-  const toggleSelectAll = () => {
-    if (selectedIds.size === filteredLeads.length) {
-      setSelectedIds(new Set());
+  const toggleSelectAllProfiles = () => {
+    if (selectedProfileIds.size === filteredProfiles.length) {
+      setSelectedProfileIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredLeads.map((l) => l.id)));
+      setSelectedProfileIds(new Set(filteredProfiles.map((p) => p.id)));
     }
   };
 
-  // Filter Leads
-  const filteredLeads = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return leads;
-    return leads.filter(
-      (l) =>
-        l.companyName.toLowerCase().includes(q) ||
-        l.recipientEmail.toLowerCase().includes(q) ||
-        l.status.toLowerCase().includes(q)
-    );
-  }, [leads, query]);
-
-  // Submit Single Lead
-  const handleAddSingleLead = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!companyName || !recipientEmail || !jobDescription) {
-      alert("Please fill out all fields.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/outreach/leads`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          leads: { companyName, recipientEmail, jobDescription },
-        }),
-      });
-
-      const json = await res.json();
-      if (json.success) {
-        // Reset form and refresh
-        setCompanyName("");
-        setRecipientEmail("");
-        setJobDescription("");
-        setShowAddModal(false);
-        fetchLeads();
-      } else {
-        alert("Failed to add lead: " + json.message);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Error adding lead.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Submit Bulk Leads (handles CSV or JSON paste)
-  const handleAddBulkLeads = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bulkInput.trim()) {
-      alert("Please paste some data first.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      let parsedLeads = [];
-
-      if (bulkFormat === "json") {
-        try {
-          parsedLeads = JSON.parse(bulkInput.trim());
-          if (!Array.isArray(parsedLeads)) {
-            throw new Error("Pasted JSON is not an array.");
-          }
-        } catch (err) {
-          alert("Invalid JSON format. Please ensure it is a valid JSON array.");
-          setLoading(false);
-          return;
-        }
-      } else {
-        // CSV Parser: parses companyName, recipientEmail, jobDescription
-        const lines = bulkInput.trim().split("\n");
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          // Split by comma, handling potential quotes
-          const cols = line.split(",").map((c) => c.trim().replace(/^["']|["']$/g, ""));
-          if (cols.length >= 3) {
-            parsedLeads.push({
-              companyName: cols[0],
-              recipientEmail: cols[1],
-              jobDescription: cols.slice(2).join(","), // description can contain commas
-            });
-          }
-        }
-
-        if (parsedLeads.length === 0) {
-          alert("Could not extract any leads from CSV. Format: Company,Email,Job Description");
-          setLoading(false);
-          return;
-        }
-      }
-
-      const res = await fetchWithAuth(`${API_BASE}/outreach/leads`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leads: parsedLeads }),
-      });
-
-      const json = await res.json();
-      if (json.success) {
-        setBulkInput("");
-        setShowAddModal(false);
-        fetchLeads();
-      } else {
-        alert("Failed to bulk add leads: " + json.message);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Error uploading bulk leads.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle image selection
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setImageFile(file);
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Submit image to Gemini backend for parsing
-  const handleExtractFromImage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!imagePreview || !imageFile) {
-      alert("Please select an image first.");
-      return;
-    }
-
-    setExtractingImage(true);
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/outreach/leads/extract-image`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image: imagePreview,
-          mimeType: imageFile.type,
-        }),
-      });
-
-      const json = await res.json();
-      if (json.success && json.data) {
-        const { companyName, recipientEmail, jobDescription } = json.data;
-        setCompanyName(companyName || "");
-        setRecipientEmail(recipientEmail || "");
-        setJobDescription(jobDescription || "");
-        setAddMode("single"); // Switch back to the single recruiter form pre-filled!
-        setImageFile(null);
-        setImagePreview(null);
-      } else {
-        alert("Failed to extract: " + json.message);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Error extracting lead details from image.");
-    } finally {
-      setExtractingImage(false);
-    }
-  };
-
-  // Trigger Gemini Cold Email Generation for all pending leads
-  const handleGenerateAll = async () => {
-    setLoading(true);
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/outreach/generate-all`, { method: "POST" });
-      const json = await res.json();
-      alert(json.message);
-      fetchLeads();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to trigger generation.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Send All READY Emails Sequentially
-  const handleSendAll = async () => {
-    setLoading(true);
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/outreach/send-all`, { method: "POST" });
-      const json = await res.json();
-      alert(json.message);
-      fetchLeads();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to send emails.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Generate Follow-Ups for selected lead IDs
-  const handleGenerateFollowups = async () => {
-    if (selectedIds.size === 0) {
-      alert("Please select at least one lead.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/outreach/followups/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadIds: Array.from(selectedIds) }),
-      });
-      const json = await res.json();
-      alert(json.message);
-      setSelectedIds(new Set());
-      fetchLeads();
-    } catch (err) {
-      console.error(err);
-      alert("Error generating follow-ups.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Send Follow-Ups for selected leads
-  const handleSendFollowups = async () => {
-    if (selectedIds.size === 0) {
-      alert("Please select at least one lead.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/outreach/followups/send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadIds: Array.from(selectedIds) }),
-      });
-      const json = await res.json();
-      alert(json.message);
-      setSelectedIds(new Set());
-      fetchLeads();
-    } catch (err) {
-      console.error(err);
-      alert("Error sending follow-ups.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Delete Lead Handler
-  const handleDeleteLead = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this lead? All email logs will be deleted too.")) {
-      return;
-    }
-
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/outreach/leads/${id}`, { method: "DELETE" });
-      const json = await res.json();
-      if (json.success) {
-        fetchLeads();
-      } else {
-        alert("Failed to delete lead.");
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // Edit Message Handler
-  const handleSaveMessageEdits = async () => {
-    if (!editingMessage) return;
-
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/outreach/messages/${editingMessage.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subject: editingMessage.subject,
-          body: editingMessage.body,
-        }),
-      });
-
-      const json = await res.json();
-      if (json.success) {
-        alert("Email saved successfully.");
-        // Refresh and close editing state
-        setEditingMessage(null);
-        setSelectedLead(null);
-        fetchLeads();
-      } else {
-        alert("Failed to save: " + json.message);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Error saving edits.");
-    }
-  };
-
-  // Send single message immediately
-  const handleSendSingleEmail = async (id: string) => {
-    setLoading(true);
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/outreach/send/${id}`, { method: "POST" });
-      const json = await res.json();
-      alert(json.message || "Email send triggered!");
-      setEditingMessage(null);
-      setSelectedLead(null);
-      fetchLeads();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to send email.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Open email reviewing drawer/modal
-  const handleOpenReviewModal = (lead: Lead) => {
-    setSelectedLead(lead);
-    // Find the latest message, or the latest unsent message
-    const unsent = lead.messages.find((m) => !m.sentAt);
-    const msg = unsent || lead.messages[lead.messages.length - 1];
-    setEditingMessage(msg ? { ...msg } : null);
-  };
-
-  // Helper for lead statuses color styling
-  const getOutreachStatusStyle = (status: string) => {
-    switch (status) {
-      case "READY":
-        return { bg: "#ecfdf5", text: "#047857", label: "Ready" };
-      case "SENDING":
-        return { bg: "#eff6ff", text: "#1d4ed8", label: "Sending..." };
-      case "SENT":
-        return { bg: "#f0fdf4", text: "#166534", label: "Sent" };
-      case "FAILED":
-        return { bg: "#fef2f2", text: "#b91c1c", label: "Failed" };
-      default:
-        return { bg: "#f3f4f6", text: "#374151", label: status };
-    }
-  };
+  // ==================== F. RENDERS AND RENDER BRANCHES ====================
 
   if (isAuthenticated === null) {
     return (
@@ -568,7 +746,6 @@ export function OutreachBoard() {
           overflow: "hidden"
         }}
       >
-        {/* Glow Spheres */}
         <div style={{ position: "absolute", top: "-10%", left: "-10%", width: "300px", height: "300px", background: "radial-gradient(circle, rgba(99,102,241,0.15) 0%, rgba(0,0,0,0) 70%)", borderRadius: "50%" }} />
         <div style={{ position: "absolute", bottom: "-10%", right: "-10%", width: "300px", height: "300px", background: "radial-gradient(circle, rgba(168,85,247,0.15) 0%, rgba(0,0,0,0) 70%)", borderRadius: "50%" }} />
 
@@ -591,13 +768,7 @@ export function OutreachBoard() {
           }}
         >
           <div style={{ textAlign: "center" }}>
-            <div style={{ 
-              fontSize: "3rem", 
-              marginBottom: "0.75rem",
-              animation: "pulseLock 2s infinite alternate" 
-            }}>
-              🔒
-            </div>
+            <div style={{ fontSize: "3rem", marginBottom: "0.75rem", animation: "pulseLock 2s infinite alternate" }}>🔒</div>
             <h3 style={{ fontSize: "1.6rem", fontWeight: 700, color: "#ffffff", margin: 0, letterSpacing: "-0.025em" }}>Secure Outreach</h3>
             <p style={{ fontSize: "0.88rem", color: "#94a3b8", marginTop: "0.5rem", lineHeight: 1.5 }}>
               A secure passcode is required to send emails, manage recruiters, and run Gemini automation.
@@ -645,7 +816,6 @@ export function OutreachBoard() {
                     color: "#94a3b8",
                     padding: "4px",
                   }}
-                  title={showPasscodeText ? "Hide passcode" : "Show passcode"}
                 >
                   {showPasscodeText ? "👁️" : "👁️‍🗨️"}
                 </button>
@@ -653,19 +823,7 @@ export function OutreachBoard() {
             </div>
 
             {authError && (
-              <div 
-                style={{ 
-                  color: "#f87171", 
-                  fontSize: "0.85rem", 
-                  fontWeight: 500,
-                  background: "rgba(239, 68, 68, 0.1)",
-                  padding: "0.75rem 1rem",
-                  borderRadius: "10px",
-                  border: "1px solid rgba(239, 68, 68, 0.2)",
-                  lineHeight: 1.4,
-                  animation: "shake 0.4s ease-in-out"
-                }}
-              >
+              <div style={{ color: "#f87171", fontSize: "0.85rem", fontWeight: 500, background: "rgba(239, 68, 68, 0.1)", padding: "0.75rem 1rem", borderRadius: "10px", border: "1px solid rgba(239, 68, 68, 0.2)", lineHeight: 1.4, animation: "shake 0.4s ease-in-out" }}>
                 ⚠️ {authError}
               </div>
             )}
@@ -692,996 +850,1224 @@ export function OutreachBoard() {
             </button>
           </form>
         </div>
-
-        {/* Global Keyframes styling */}
-        <style>{`
-          @keyframes fadeInUp {
-            from {
-              opacity: 0;
-              transform: translateY(20px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-          @keyframes pulseLock {
-            from { transform: scale(1); }
-            to { transform: scale(1.08); }
-          }
-          @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-6px); }
-            75% { transform: translateX(6px); }
-          }
-          .auth-input:focus {
-            border-color: #6366f1 !important;
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25) !important;
-            background: rgba(255, 255, 255, 0.08) !important;
-          }
-        `}</style>
       </div>
     );
   }
 
   return (
-    <div className="tracker-section" style={{ minHeight: "65vh" }}>
-      {/* 1. Metrics Counter Dashboard */}
-      <div className="tracker-metrics-grid" style={{ marginBottom: "1.5rem" }}>
-        <div className="metric-card metric-total">
-          <div className="metric-card-inner">
-            <span className="metric-label">Recruiters</span>
-            <span className="metric-val">{metrics.total}</span>
-          </div>
-          <div className="metric-card-accent" style={{ background: "var(--accent)" }} />
+    <div className="outreach-flow-app" style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+      {/* Header Deck */}
+      <div 
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          background: "rgba(255, 255, 255, 0.8)",
+          backdropFilter: "blur(12px)",
+          border: "1px solid var(--border)",
+          borderRadius: "16px",
+          padding: "1.25rem 2rem",
+          boxShadow: "var(--shadow)"
+        }}
+      >
+        <div>
+          <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "#1e293b", margin: 0, letterSpacing: "-0.03em", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>🚀</span> OutreachFlow <span style={{ fontSize: "0.75rem", padding: "2px 8px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", color: "white", borderRadius: "999px", fontWeight: 600 }}>MVP</span>
+          </h1>
+          <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: "0.9rem" }}>Contextual, high-signal referral and networking outreach scale system</p>
         </div>
 
-        <div className="metric-card">
-          <div className="metric-card-inner">
-            <span className="metric-label">Ready Emails</span>
-            <span className="metric-val text-blue" style={{ color: "#2563eb" }}>
-              {metrics.ready}
-            </span>
-          </div>
-          <div className="metric-card-accent" style={{ background: "#2563eb" }} />
-        </div>
-
-        <div className="metric-card">
-          <div className="metric-card-inner">
-            <span className="metric-label">Outbox Sent</span>
-            <span className="metric-val text-green" style={{ color: "#16a34a" }}>
-              {metrics.sent}
-            </span>
-          </div>
-          <div className="metric-card-accent" style={{ background: "#16a34a" }} />
-        </div>
-
-        <div className="metric-card">
-          <div className="metric-card-inner">
-            <span className="metric-label">SMTP Errors</span>
-            <span className="metric-val text-red" style={{ color: "#dc2626" }}>
-              {metrics.failed}
-            </span>
-          </div>
-          <div className="metric-card-accent" style={{ background: "#dc2626" }} />
-        </div>
-      </div>
-
-      {/* 2. Actions Toolbar */}
-      <div className="tracker-toolbar-container" style={{ margin: "2rem 0 1rem 0" }}>
-        <div className="tracker-toolbar-left">
-          <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#111827", margin: "0" }}>Outreach Automation</h2>
-          <p className="tracker-toolbar-sub" style={{ margin: "4px 0 0", color: "var(--muted)" }}>
-            Sequential, highly targeted Gmail cold emailing powered by Google Gemini AI
-          </p>
-        </div>
-
-        <div className="tracker-toolbar-right" style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          {/* Lock Session Button */}
-          <button
+        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+          <button 
+            onClick={loadAllData} 
+            disabled={loading}
+            style={{
+              padding: "0.5rem 1rem",
+              background: "white",
+              border: "1px solid var(--border)",
+              borderRadius: "10px",
+              fontSize: "0.88rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px"
+            }}
+          >
+            🔄 Sync Data
+          </button>
+          <button 
             onClick={handleSignOut}
             style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              minHeight: "42px",
               padding: "0.5rem 1rem",
               background: "#fee2e2",
               color: "#dc2626",
               border: "1px solid #fecaca",
               borderRadius: "10px",
-              fontSize: "0.9rem",
+              fontSize: "0.88rem",
               fontWeight: 500,
               cursor: "pointer",
-              transition: "all 150ms ease",
-            }}
-            title="Lock Session / Sign Out"
-          >
-            🔒 Lock Session
-          </button>
-
-          {/* Search Box */}
-          <div className="tracker-search-box">
-            <input
-              type="text"
-              placeholder="Search companies..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              style={{ minHeight: "42px", padding: "0.5rem 0.85rem", borderRadius: "10px", border: "1px solid var(--border)" }}
-            />
-          </div>
-
-          {/* Add Recruiter Button */}
-          <button
-            className="add-app-btn"
-            onClick={() => setShowAddModal(true)}
-            style={{
-              display: "inline-flex",
+              display: "flex",
               alignItems: "center",
-              gap: "0.4rem",
-              minHeight: "42px",
-              padding: "0.5rem 1.15rem",
-              background: "var(--accent)",
-              color: "white",
-              border: "none",
-              borderRadius: "10px",
-              fontSize: "0.9rem",
-              fontWeight: 500,
-              cursor: "pointer",
+              gap: "6px"
             }}
           >
-            ➕ Add Leads
-          </button>
-
-          {/* Generate All Button */}
-          <button
-            className="add-app-btn"
-            onClick={handleGenerateAll}
-            disabled={loading || leads.length === 0}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              minHeight: "42px",
-              padding: "0.5rem 1.15rem",
-              background: "#4f46e5",
-              color: "white",
-              border: "none",
-              borderRadius: "10px",
-              fontSize: "0.9rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              opacity: loading || leads.length === 0 ? 0.6 : 1,
-            }}
-            title="Fetches resume/projects and generates cold emails via Gemini"
-          >
-            ✨ Generate All
-          </button>
-
-          {/* Send All Button */}
-          <button
-            className="add-app-btn"
-            onClick={handleSendAll}
-            disabled={loading || metrics.ready === 0}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              minHeight: "42px",
-              padding: "0.5rem 1.15rem",
-              background: "#059669",
-              color: "white",
-              border: "none",
-              borderRadius: "10px",
-              fontSize: "0.9rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              opacity: loading || metrics.ready === 0 ? 0.6 : 1,
-            }}
-            title="Sequentially sends all READY cold emails with a 2-5 second rate-limiting delay"
-          >
-            ✉️ Send All READY
+            🔒 Lock
           </button>
         </div>
       </div>
 
-      {/* 3. Multi-Select Context Bar */}
-      {selectedIds.size > 0 && (
-        <div
-          className="multi-select-bar"
-          style={{
-            background: "rgba(255, 250, 241, 0.95)",
-            border: "1px solid var(--accent)",
-            borderRadius: "12px",
-            padding: "0.75rem 1.25rem",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "1rem",
-            boxShadow: "var(--shadow)",
-            animation: "fadeIn 180ms ease",
-          }}
-        >
-          <div style={{ fontSize: "0.95rem", fontWeight: 500, color: "var(--accent-dark)" }}>
-            Selected <strong>{selectedIds.size}</strong> recruiter(s)
+      {/* Tabs Navigation */}
+      <div 
+        style={{
+          display: "flex",
+          gap: "4px",
+          background: "#f1f5f9",
+          padding: "6px",
+          borderRadius: "14px",
+          border: "1px solid #e2e8f0",
+          overflowX: "auto"
+        }}
+      >
+        {[
+          { key: "analytics", label: "📊 Overview" },
+          { key: "profiles", label: "👥 Target Profiles" },
+          { key: "resumes", label: "📄 Resumes" },
+          { key: "jobs", label: "💼 Target Jobs" },
+          { key: "templates", label: "📝 Templates" },
+          { key: "generation", label: "✨ Gen Queue" },
+          { key: "outbox", label: "✉️ Outbox Outbox" }
+        ].map((tab) => {
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key as any)}
+              style={{
+                flex: "1 1 auto",
+                padding: "0.65rem 1rem",
+                borderRadius: "10px",
+                border: "none",
+                background: isActive ? "white" : "transparent",
+                color: isActive ? "#4f46e5" : "#475569",
+                fontWeight: isActive ? 600 : 500,
+                fontSize: "0.92rem",
+                cursor: "pointer",
+                boxShadow: isActive ? "0 1px 3px rgba(0,0,0,0.05)" : "none",
+                transition: "all 150ms ease",
+                whiteSpace: "nowrap"
+              }}
+            >
+              {tab.label}
+              {tab.key === "generation" && genQueueJobs.filter(j => j.status === "PENDING" || j.status === "GENERATING").length > 0 && (
+                <span style={{ marginLeft: "6px", width: "8px", height: "8px", background: "#ef4444", borderRadius: "50%", display: "inline-block", animation: "pulseGlow 1s infinite" }} />
+              )}
+              {tab.key === "outbox" && approvalQueue.length > 0 && (
+                <span style={{ marginLeft: "6px", background: "#4f46e5", color: "white", padding: "1px 6px", borderRadius: "999px", fontSize: "0.72rem", fontWeight: 700 }}>
+                  {approvalQueue.length}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ==================== TAB 1: ANALYTICS OVERVIEW ==================== */}
+      {activeTab === "analytics" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          {/* Main Analytics Cards Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1.25rem" }}>
+            {[
+              { label: "Target Profiles", val: stats.totalProfiles, color: "#4f46e5" },
+              { label: "AI Generations", val: stats.totalGenerated, color: "#7c3aed" },
+              { label: "Approved Mail", val: stats.approvedCount, color: "#10b981" },
+              { label: "Outbox Sent", val: stats.sentCount, color: "#059669" },
+              { label: "Replies Received", val: stats.repliesCount, color: "#0891b2" },
+              { label: "Referrals Gained", val: stats.referralsReceived, color: "#d97706" },
+              { label: "Interviews Scheduled", val: stats.interviewsScheduled, color: "#ef4444" }
+            ].map((card, idx) => (
+              <div 
+                key={idx} 
+                style={{
+                  background: "white",
+                  border: "1px solid var(--border)",
+                  borderRadius: "16px",
+                  padding: "1.5rem",
+                  boxShadow: "var(--shadow)",
+                  position: "relative",
+                  overflow: "hidden"
+                }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.025em" }}>{card.label}</span>
+                  <span style={{ fontSize: "2rem", fontWeight: 800, color: "#1e293b", letterSpacing: "-0.03em" }}>{card.val}</span>
+                </div>
+                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "4px", background: card.color }} />
+              </div>
+            ))}
           </div>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button
-              onClick={handleGenerateFollowups}
-              disabled={loading}
-              style={{
-                background: "#7c3aed",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                padding: "0.45rem 1rem",
-                fontSize: "0.88rem",
-                cursor: "pointer",
-                fontWeight: 500,
-              }}
-            >
-              🔄 Generate Follow-Up
-            </button>
-            <button
-              onClick={handleSendFollowups}
-              disabled={loading}
-              style={{
-                background: "#0891b2",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                padding: "0.45rem 1rem",
-                fontSize: "0.88rem",
-                cursor: "pointer",
-                fontWeight: 500,
-              }}
-            >
-              🚀 Send Selected Follow-Ups
-            </button>
+
+          {/* Rates charts & Visuals */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+            <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: "16px", padding: "2rem", boxShadow: "var(--shadow)", display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <h3 style={{ margin: 0, fontSize: "1.1rem", color: "#1e293b", fontWeight: 700 }}>Conversion Performance</h3>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", marginTop: "1rem" }}>
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#475569" }}>Outreach Reply Rate</span>
+                    <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "#4f46e5" }}>{stats.replyRate}%</span>
+                  </div>
+                  <div style={{ height: "10px", background: "#f1f5f9", borderRadius: "999px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${stats.replyRate}%`, background: "linear-gradient(to right, #4f46e5, #6366f1)", borderRadius: "999px" }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#475569" }}>Positive Response Conversion</span>
+                    <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "#10b981" }}>{stats.positiveReplyRate}%</span>
+                  </div>
+                  <div style={{ height: "10px", background: "#f1f5f9", borderRadius: "999px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${stats.positiveReplyRate}%`, background: "linear-gradient(to right, #10b981, #34d399)", borderRadius: "999px" }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quickstart tutorial widget */}
+            <div style={{ background: "linear-gradient(135deg, #1e1b4b, #311042)", color: "white", borderRadius: "16px", padding: "2rem", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "1.5rem", boxShadow: "0 10px 25px rgba(0,0,0,0.15)" }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700 }}>OutreachFlow Campaign Pipeline</h3>
+                <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#c7d2fe" }}>Four simple steps to double your referral response rates:</p>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", fontSize: "0.82rem" }}>
+                <div style={{ background: "rgba(255,255,255,0.06)", padding: "10px", borderRadius: "10px" }}>
+                  <span style={{ display: "block", fontSize: "1.1rem", marginBottom: "4px" }}>1️⃣</span>
+                  <strong>Upload Resume</strong>: Upload parsed PDFs to extract skill profiles.
+                </div>
+                <div style={{ background: "rgba(255,255,255,0.06)", padding: "10px", borderRadius: "10px" }}>
+                  <span style={{ display: "block", fontSize: "1.1rem", marginBottom: "4px" }}>2️⃣</span>
+                  <strong>Import Profiles</strong>: Paste CSV lists of target employees.
+                </div>
+                <div style={{ background: "rgba(255,255,255,0.06)", padding: "10px", borderRadius: "10px" }}>
+                  <span style={{ display: "block", fontSize: "1.1rem", marginBottom: "4px" }}>3️⃣</span>
+                  <strong>Approve drafts</strong>: Review contextual AI messages in the approval queue.
+                </div>
+                <div style={{ background: "rgba(255,255,255,0.06)", padding: "10px", borderRadius: "10px" }}>
+                  <span style={{ display: "block", fontSize: "1.1rem", marginBottom: "4px" }}>4️⃣</span>
+                  <strong>SMTP Dispatch</strong>: Sequentially send approved emails.
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* 4. Leads Table */}
-      {filteredLeads.length === 0 ? (
-        <div className="empty-state" style={{ marginTop: "1rem" }}>
-          <h3>No recruiter leads found</h3>
-          <p>
-            Add a single lead or paste multiple leads to begin. Use &quot;Generate All&quot; to draft cold emails instantly.
-          </p>
-        </div>
-      ) : (
-        <div className="tracker-table-container" style={{ overflowX: "auto" }}>
-          <table className="tracker-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={{ width: "40px", textAlign: "center" }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.size === filteredLeads.length && filteredLeads.length > 0}
-                    onChange={toggleSelectAll}
-                    style={{ cursor: "pointer", transform: "scale(1.15)" }}
-                  />
-                </th>
-                <th>Company</th>
-                <th>Recipient Email</th>
-                <th>Outreach Status</th>
-                <th>Active Campaign Type</th>
-                <th>Last Sent Date</th>
-                <th style={{ textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredLeads.map((lead) => {
-                const statusStyle = getOutreachStatusStyle(lead.status);
+      {/* ==================== TAB 2: PROFILES MANAGER ==================== */}
+      {activeTab === "profiles" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h2 style={{ fontSize: "1.3rem", fontWeight: 700, margin: 0 }}>Target Employees & Profiles</h2>
+              <p style={{ margin: "2px 0 0", fontSize: "0.85rem", color: "#64748b" }}>Manage and import targets from company lists</p>
+            </div>
+            <button 
+              onClick={() => setShowAddProfileModal(true)}
+              style={{
+                padding: "0.6rem 1.25rem",
+                background: "var(--accent)",
+                color: "white",
+                border: "none",
+                borderRadius: "10px",
+                fontWeight: 600,
+                fontSize: "0.9rem",
+                cursor: "pointer",
+                boxShadow: "0 2px 8px rgba(220,104,3,0.15)"
+              }}
+            >
+              ➕ Add Profiles / Bulk Import
+            </button>
+          </div>
 
-                // Find active message
-                const unsent = lead.messages.find((m) => !m.sentAt);
-                const activeMessage = unsent || lead.messages[lead.messages.length - 1];
+          {/* Quick Filter Bar */}
+          <div style={{ display: "flex", gap: "0.75rem" }}>
+            <input 
+              type="text" 
+              placeholder="Search by name, role, company..." 
+              value={profileSearchQuery}
+              onChange={(e) => setProfileSearchQuery(e.target.value)}
+              style={{ flex: 1, padding: "0.6rem 1rem", border: "1px solid var(--border)", borderRadius: "10px", outline: "none" }}
+            />
+            <select
+              value={profileFilterCompany}
+              onChange={(e) => setProfileFilterCompany(e.target.value)}
+              style={{ padding: "0.6rem", border: "1px solid var(--border)", borderRadius: "10px", background: "white" }}
+            >
+              <option value="">All Companies</option>
+              {uniqueProfileCompanies.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
 
-                const lastSentMsg = [...lead.messages].reverse().find((m) => m.sentAt);
-                const lastSentDate = lastSentMsg?.sentAt
-                  ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(
-                      new Date(lastSentMsg.sentAt)
-                    )
-                  : "-";
-
-                return (
-                  <tr key={lead.id} className="tracker-row">
-                    <td style={{ textAlign: "center", verticalAlign: "middle" }}>
-                      <input
+          {/* Profiles Data Table */}
+          {filteredProfiles.length === 0 ? (
+            <div style={{ padding: "4rem", textAlign: "center", background: "#f8fafc", border: "1px dashed var(--border)", borderRadius: "16px" }}>
+              <h3 style={{ color: "#475569" }}>No target profiles imported yet</h3>
+              <p style={{ color: "#64748b", fontSize: "0.9rem" }}>Import single employee details or drag CSV files to start building outreach pipelines.</p>
+            </div>
+          ) : (
+            <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: "16px", overflow: "hidden", boxShadow: "var(--shadow)" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#f8fafc", borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                    <th style={{ padding: "1rem", width: "40px", textAlign: "center" }}>
+                      <input 
                         type="checkbox"
-                        checked={selectedIds.has(lead.id)}
-                        onChange={() => toggleSelect(lead.id)}
-                        style={{ cursor: "pointer", transform: "scale(1.15)" }}
+                        checked={selectedProfileIds.size === filteredProfiles.length && filteredProfiles.length > 0}
+                        onChange={toggleSelectAllProfiles}
                       />
-                    </td>
-                    <td className="company-col" style={{ fontWeight: 600 }}>
-                      {lead.companyName}
-                    </td>
-                    <td>{lead.recipientEmail}</td>
-                    <td>
-                      <span
-                        className="status-dropdown-trigger"
+                    </th>
+                    <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Name</th>
+                    <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Role</th>
+                    <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Company</th>
+                    <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Email / Link</th>
+                    <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Source</th>
+                    <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Tags</th>
+                    <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569", textAlign: "right" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProfiles.map((p) => (
+                    <tr key={p.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                      <td style={{ padding: "1rem", textAlign: "center" }}>
+                        <input 
+                          type="checkbox"
+                          checked={selectedProfileIds.has(p.id)}
+                          onChange={() => toggleSelectProfile(p.id)}
+                        />
+                      </td>
+                      <td style={{ padding: "1rem", fontWeight: 700, color: "#1e293b" }}>{p.name}</td>
+                      <td style={{ padding: "1rem" }}>{p.role}</td>
+                      <td style={{ padding: "1rem", fontWeight: 600 }}>{p.company}</td>
+                      <td style={{ padding: "1rem", fontSize: "0.88rem" }}>
+                        <div>{p.email || "-"}</div>
+                        {p.linkedinUrl && <a href={p.linkedinUrl} target="_blank" rel="noreferrer" style={{ fontSize: "0.78rem", color: "#4f46e5" }}>LinkedIn Profile</a>}
+                      </td>
+                      <td style={{ padding: "1rem" }}>
+                        <span style={{ fontSize: "0.75rem", background: p.source === "MANUAL" ? "#eff6ff" : "#f5f5f4", color: p.source === "MANUAL" ? "#1d4ed8" : "#44403c", padding: "2px 8px", borderRadius: "999px", fontWeight: 600 }}>
+                          {p.source}
+                        </span>
+                      </td>
+                      <td style={{ padding: "1rem" }}>
+                        <div style={{ display: "flex", gap: "4px" }}>
+                          {p.tags.map((t) => (
+                            <span key={t} style={{ fontSize: "0.72rem", background: "#f1f5f9", padding: "2px 6px", borderRadius: "6px" }}>{t}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={{ padding: "1rem", textAlign: "right" }}>
+                        <button 
+                          onClick={() => handleDeleteProfile(p.id)}
+                          style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", padding: "4px" }}
+                        >
+                          🗑️
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Action dock when items are selected */}
+          {selectedProfileIds.size > 0 && (
+            <div 
+              style={{
+                position: "fixed",
+                bottom: "2rem",
+                left: "50%",
+                transform: "translateX(-50%)",
+                background: "rgba(30, 27, 75, 0.95)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: "16px",
+                padding: "1rem 2rem",
+                display: "flex",
+                gap: "1.5rem",
+                alignItems: "center",
+                color: "white",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+                zIndex: 99
+              }}
+            >
+              <span>Selected <strong>{selectedProfileIds.size}</strong> profile(s)</span>
+              
+              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                <select
+                  value={selectedTemplateId}
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  style={{ padding: "0.5rem", borderRadius: "8px", background: "white", color: "#1e293b", border: "none" }}
+                >
+                  <option value="">Choose Template...</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name} ({t.type})</option>
+                  ))}
+                </select>
+
+                <select
+                  value={selectedJobId}
+                  onChange={(e) => setSelectedJobId(e.target.value)}
+                  style={{ padding: "0.5rem", borderRadius: "8px", background: "white", color: "#1e293b", border: "none" }}
+                >
+                  <option value="">Job Context (Optional)...</option>
+                  {manualJobs.map((j) => (
+                    <option key={j.id} value={j.id}>{j.title} @ {j.company}</option>
+                  ))}
+                </select>
+
+                <button 
+                  onClick={handleLaunchGeneration}
+                  style={{
+                    background: "linear-gradient(to right, #4f46e5, #7c3aed)",
+                    border: "none",
+                    color: "white",
+                    padding: "0.5rem 1.25rem",
+                    borderRadius: "8px",
+                    fontWeight: 600,
+                    cursor: "pointer"
+                  }}
+                >
+                  ✨ Generate bulk outreach
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ==================== TAB 3: RESUME MANAGER ==================== */}
+      {activeTab === "resumes" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h2 style={{ fontSize: "1.3rem", fontWeight: 700, margin: 0 }}>Resume Manager</h2>
+              <p style={{ margin: "2px 0 0", fontSize: "0.85rem", color: "#64748b" }}>Manage multiple resumes to drive dynamic AI generation context</p>
+            </div>
+            <button 
+              onClick={() => setShowAddResumeModal(true)}
+              style={{
+                padding: "0.6rem 1.25rem",
+                background: "var(--accent)",
+                color: "white",
+                border: "none",
+                borderRadius: "10px",
+                fontWeight: 600,
+                fontSize: "0.9rem",
+                cursor: "pointer"
+              }}
+            >
+              ➕ Upload Resume PDF
+            </button>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+            {/* List */}
+            <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: "16px", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Master Resumes</h3>
+              
+              {resumes.length === 0 ? (
+                <div style={{ padding: "2rem", textAlign: "center", background: "#f8fafc", borderRadius: "12px", border: "1px dashed var(--border)" }}>
+                  No resumes uploaded. Please upload a PDF to extract ATS parameters.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  {resumes.map((r) => {
+                    const isActive = activeResumeId === r.id;
+                    return (
+                      <div 
+                        key={r.id}
                         style={{
-                          background: statusStyle.bg,
-                          color: statusStyle.text,
-                          padding: "0.3rem 0.85rem",
-                          fontSize: "0.78rem",
-                          fontWeight: 600,
-                          borderRadius: "999px",
-                          display: "inline-flex",
+                          border: isActive ? "2px solid #4f46e5" : "1px solid var(--border)",
+                          borderRadius: "12px",
+                          padding: "1rem",
+                          display: "flex",
+                          justifyContent: "space-between",
                           alignItems: "center",
-                          cursor: "default",
+                          background: isActive ? "#fefefe" : "white"
                         }}
                       >
-                        {statusStyle.label}
-                      </span>
-                    </td>
-                    <td>
-                      {activeMessage ? (
-                        <span style={{ fontSize: "0.88rem", fontWeight: 500, color: "var(--muted)" }}>
-                          {activeMessage.type === "INITIAL" ? "Cold Draft" : `Follow-up ${activeMessage.type.split("_")[1]}`}
-                          {!activeMessage.sentAt && <span style={{ color: "#d97706", marginLeft: "4px" }}>(Draft)</span>}
-                        </span>
-                      ) : (
-                        <span style={{ fontStyle: "italic", color: "var(--border)", fontSize: "0.85rem" }}>None Generated</span>
-                      )}
-                    </td>
-                    <td>{lastSentDate}</td>
-                    <td style={{ textAlign: "right" }}>
-                      <div style={{ display: "inline-flex", gap: "0.35rem" }}>
-                        {activeMessage && (
-                          <button
-                            onClick={() => handleOpenReviewModal(lead)}
-                            style={{
-                              background: "transparent",
-                              border: "1px solid var(--border)",
-                              borderRadius: "8px",
-                              padding: "0.35rem 0.75rem",
-                              fontSize: "0.82rem",
-                              cursor: "pointer",
-                              color: "var(--text)",
-                              fontWeight: 500,
-                            }}
-                            title="Review generated email text"
-                          >
-                            👁️ Review
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleDeleteLead(lead.id)}
-                          style={{
-                            background: "transparent",
-                            border: "1px solid transparent",
-                            borderRadius: "8px",
-                            padding: "0.35rem 0.5rem",
-                            fontSize: "0.82rem",
-                            cursor: "pointer",
-                            color: "#dc2626",
-                          }}
-                          title="Delete Lead"
+                        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                          <input 
+                            type="radio" 
+                            name="active-resume"
+                            checked={isActive}
+                            onChange={() => setActiveResumeId(r.id)}
+                            style={{ width: "16px", height: "16px" }}
+                          />
+                          <div>
+                            <strong style={{ display: "block" }}>{r.title}</strong>
+                            <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Parsed technical skills: {r.skills.length}</span>
+                          </div>
+                        </div>
+
+                        <button 
+                          onClick={() => handleDeleteResume(r.id)}
+                          style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer" }}
                         >
                           🗑️
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* 5. ADD LEADS MODAL */}
-      {showAddModal && (
-        <div className="glass-modal-overlay">
-          <div className="glass-modal-content" style={{ width: "580px" }}>
-            <div className="glass-modal-header" style={{ borderBottom: "1px solid var(--border)", padding: "1.25rem 1.5rem" }}>
-              <h3 style={{ fontSize: "1.25rem", fontWeight: 600, margin: 0 }}>Add Recruiter Leads</h3>
-              <button
-                onClick={() => setShowAddModal(false)}
-                style={{ background: "transparent", border: "none", fontSize: "1.2rem", cursor: "pointer" }}
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Toggle Modes */}
-            <div style={{ display: "flex", borderBottom: "1px solid var(--border)" }}>
-              <button
-                onClick={() => setAddMode("single")}
-                style={{
-                  flex: 1,
-                  padding: "0.75rem",
-                  border: "none",
-                  background: addMode === "single" ? "rgba(49, 37, 24, 0.04)" : "transparent",
-                  fontWeight: addMode === "single" ? 600 : 400,
-                  color: addMode === "single" ? "var(--accent)" : "var(--muted)",
-                  borderBottom: addMode === "single" ? "2px solid var(--accent)" : "none",
-                  cursor: "pointer",
-                }}
-              >
-                Single Recruiter
-              </button>
-              <button
-                onClick={() => setAddMode("bulk")}
-                style={{
-                  flex: 1,
-                  padding: "0.75rem",
-                  border: "none",
-                  background: addMode === "bulk" ? "rgba(49, 37, 24, 0.04)" : "transparent",
-                  fontWeight: addMode === "bulk" ? 600 : 400,
-                  color: addMode === "bulk" ? "var(--accent)" : "var(--muted)",
-                  borderBottom: addMode === "bulk" ? "2px solid var(--accent)" : "none",
-                  cursor: "pointer",
-                }}
-              >
-                Bulk Copy/Paste
-              </button>
-              <button
-                onClick={() => setAddMode("image")}
-                style={{
-                  flex: 1,
-                  padding: "0.75rem",
-                  border: "none",
-                  background: addMode === "image" ? "rgba(49, 37, 24, 0.04)" : "transparent",
-                  fontWeight: addMode === "image" ? 600 : 400,
-                  color: addMode === "image" ? "var(--accent)" : "var(--muted)",
-                  borderBottom: addMode === "image" ? "2px solid var(--accent)" : "none",
-                  cursor: "pointer",
-                }}
-              >
-                📸 Add via Image/Screenshot
-              </button>
-            </div>
-
-            <div className="glass-modal-body" style={{ padding: "1.5rem" }}>
-              {addMode === "single" && (
-                <form onSubmit={handleAddSingleLead} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                  <div>
-                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--muted)", marginBottom: "4px" }}>
-                      Company Name *
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Stripe, Apple, etc."
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      required
-                      style={{
-                        width: "100%",
-                        padding: "0.6rem 0.85rem",
-                        borderRadius: "10px",
-                        border: "1px solid var(--border)",
-                        fontFamily: "inherit",
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--muted)", marginBottom: "4px" }}>
-                      Recruiter/Contact Email *
-                    </label>
-                    <input
-                      type="email"
-                      placeholder="recruiter@company.com"
-                      value={recipientEmail}
-                      onChange={(e) => setRecipientEmail(e.target.value)}
-                      required
-                      style={{
-                        width: "100%",
-                        padding: "0.6rem 0.85rem",
-                        borderRadius: "10px",
-                        border: "1px solid var(--border)",
-                        fontFamily: "inherit",
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--muted)", marginBottom: "4px" }}>
-                      Job Description / Requirements *
-                    </label>
-                    <textarea
-                      placeholder="Paste the target job description or requirements here..."
-                      value={jobDescription}
-                      onChange={(e) => setJobDescription(e.target.value)}
-                      required
-                      rows={6}
-                      style={{
-                        width: "100%",
-                        padding: "0.6rem 0.85rem",
-                        borderRadius: "10px",
-                        border: "1px solid var(--border)",
-                        fontFamily: "inherit",
-                        resize: "vertical",
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1rem" }}>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddModal(false)}
-                      style={{
-                        padding: "0.5rem 1rem",
-                        border: "1px solid var(--border)",
-                        borderRadius: "8px",
-                        background: "transparent",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      style={{
-                        padding: "0.5rem 1.25rem",
-                        background: "var(--accent)",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "8px",
-                        cursor: "pointer",
-                        fontWeight: 500,
-                      }}
-                    >
-                      Add Lead
-                    </button>
-                  </div>
-                </form>
-              )}
-              {addMode === "bulk" && (
-                <form onSubmit={handleAddBulkLeads} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                  <div>
-                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--muted)", marginBottom: "8px" }}>
-                      Format Options
-                    </label>
-                    <div style={{ display: "flex", gap: "1rem", marginBottom: "0.5rem" }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", cursor: "pointer" }}>
-                        <input
-                          type="radio"
-                          name="bulkFormat"
-                          checked={bulkFormat === "json"}
-                          onChange={() => setBulkFormat("json")}
-                        />
-                        JSON Array
-                      </label>
-                      <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", cursor: "pointer" }}>
-                        <input
-                          type="radio"
-                          name="bulkFormat"
-                          checked={bulkFormat === "csv"}
-                          onChange={() => setBulkFormat("csv")}
-                        />
-                        CSV Format (Company,Email,Job Description)
-                      </label>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--muted)", marginBottom: "4px" }}>
-                      Data Paste *
-                    </label>
-                    <textarea
-                      placeholder={
-                        bulkFormat === "json"
-                          ? `[\n  {\n    "companyName": "Stripe",\n    "recipientEmail": "recruiter@stripe.com",\n    "jobDescription": "Full stack engineer React node..."\n  }\n]`
-                          : "Google,recruiter@google.com,We are looking for frontend engineer...\nMeta,hr@meta.com,Senior backend architect..."
-                      }
-                      value={bulkInput}
-                      onChange={(e) => setBulkInput(e.target.value)}
-                      required
-                      rows={10}
-                      style={{
-                        width: "100%",
-                        padding: "0.6rem 0.85rem",
-                        borderRadius: "10px",
-                        border: "1px solid var(--border)",
-                        fontFamily: "monospace",
-                        fontSize: "0.85rem",
-                        resize: "vertical",
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1rem" }}>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddModal(false)}
-                      style={{
-                        padding: "0.5rem 1rem",
-                        border: "1px solid var(--border)",
-                        borderRadius: "8px",
-                        background: "transparent",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      style={{
-                        padding: "0.5rem 1.25rem",
-                        background: "var(--accent)",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "8px",
-                        cursor: "pointer",
-                        fontWeight: 500,
-                      }}
-                    >
-                      Parse & Bulk Add
-                    </button>
-                  </div>
-                </form>
-              )}
-              {addMode === "image" && (
-                <form onSubmit={handleExtractFromImage} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                  <div
-                    style={{
-                      border: "2px dashed var(--border)",
-                      borderRadius: "12px",
-                      padding: "2rem",
-                      textAlign: "center",
-                      background: "rgba(0,0,0,0.01)",
-                      cursor: "pointer",
-                      position: "relative",
-                      transition: "all 0.2s ease"
-                    }}
-                  >
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        width: "100%",
-                        height: "100%",
-                        opacity: 0,
-                        cursor: "pointer"
-                      }}
-                    />
-                    <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>📸</div>
-                    <p style={{ fontWeight: 500, margin: "0 0 4px 0", color: "var(--text)" }}>
-                      {imageFile ? imageFile.name : "Click or drag an image here to upload"}
-                    </p>
-                    <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: 0 }}>
-                      Supports PNG, JPG, or screenshots of job listings
-                    </p>
-                  </div>
-
-                  {imagePreview && (
-                    <div style={{ textAlign: "center", margin: "0.5rem 0" }}>
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        style={{
-                          maxWidth: "100%",
-                          maxHeight: "180px",
-                          borderRadius: "8px",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                          objectFit: "contain"
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1rem" }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImageFile(null);
-                        setImagePreview(null);
-                        setShowAddModal(false);
-                      }}
-                      style={{
-                        padding: "0.5rem 1rem",
-                        border: "1px solid var(--border)",
-                        borderRadius: "8px",
-                        background: "transparent",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={extractingImage || !imagePreview}
-                      style={{
-                        padding: "0.5rem 1.25rem",
-                        background: "#4f46e5",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "8px",
-                        cursor: "pointer",
-                        fontWeight: 600,
-                        opacity: extractingImage || !imagePreview ? 0.6 : 1,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "0.5rem"
-                      }}
-                    >
-                      {extractingImage ? "✨ AI Extracting..." : "✨ Extract Lead with Gemini"}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 6. REVIEW & EDIT EMAIL MODAL */}
-      {selectedLead && editingMessage && (
-        <div className="glass-modal-overlay">
-          <div className="glass-modal-content" style={{ width: "650px" }}>
-            <div className="glass-modal-header" style={{ borderBottom: "1px solid var(--border)", padding: "1.25rem 1.5rem" }}>
-              <div>
-                <h3 style={{ fontSize: "1.2rem", fontWeight: 600, margin: 0 }}>Review Email Campaign</h3>
-                <p style={{ margin: "4px 0 0 0", fontSize: "0.85rem", color: "var(--muted)" }}>
-                  Recruiter Contact: <strong>{selectedLead.recipientEmail}</strong> for <strong>{selectedLead.companyName}</strong>
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setSelectedLead(null);
-                  setEditingMessage(null);
-                }}
-                style={{ background: "transparent", border: "none", fontSize: "1.2rem", cursor: "pointer" }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="glass-modal-body" style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-              {editingMessage.sentAt && (
-                <div
-                  style={{
-                    background: "#ecfdf5",
-                    border: "1px solid #059669",
-                    borderRadius: "10px",
-                    padding: "0.65rem 1rem",
-                    fontSize: "0.88rem",
-                    color: "#047857",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.4rem",
-                  }}
-                >
-                  ✔ This email was successfully sent on {new Date(editingMessage.sentAt).toLocaleString()}
+                    );
+                  })}
                 </div>
               )}
+            </div>
 
-              <div>
-                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--muted)", marginBottom: "4px" }}>
-                  Subject Line
-                </label>
-                <input
-                  type="text"
-                  value={editingMessage.subject}
-                  onChange={(e) => setEditingMessage({ ...editingMessage, subject: e.target.value })}
-                  disabled={!!editingMessage.sentAt}
-                  style={{
-                    width: "100%",
-                    padding: "0.6rem 0.85rem",
-                    borderRadius: "10px",
-                    border: "1px solid var(--border)",
-                    fontFamily: "inherit",
-                    fontWeight: 500,
-                  }}
-                />
-              </div>
+            {/* Details Preview */}
+            <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: "16px", padding: "1.5rem" }}>
+              <h3 style={{ margin: 0, fontSize: "1.1rem", marginBottom: "1rem" }}>Selected Resume Extracted Context</h3>
+              
+              {resumes.find(r => r.id === activeResumeId) ? (
+                (() => {
+                  const selected = resumes.find(r => r.id === activeResumeId)!;
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                      <div>
+                        <strong>Resume Title: </strong> {selected.title}
+                      </div>
 
-              <div>
-                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--muted)", marginBottom: "4px" }}>
-                  Email Body
-                </label>
-                <textarea
-                  value={editingMessage.body}
-                  onChange={(e) => setEditingMessage({ ...editingMessage, body: e.target.value })}
-                  disabled={!!editingMessage.sentAt}
-                  rows={14}
-                  style={{
-                    width: "100%",
-                    padding: "0.75rem 0.9rem",
-                    borderRadius: "12px",
-                    border: "1px solid var(--border)",
-                    fontFamily: "monospace",
-                    fontSize: "0.9rem",
-                    lineHeight: 1.5,
-                    resize: "vertical",
-                  }}
-                />
-              </div>
+                      <div>
+                        <strong>Extracted Key Skills Profile:</strong>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
+                          {selected.skills.map((s) => (
+                            <span key={s} style={{ fontSize: "0.78rem", background: "#f3f4f6", padding: "4px 10px", borderRadius: "999px", border: "1px solid #e5e7eb", color: "#374151", fontWeight: 600 }}>{s}</span>
+                          ))}
+                        </div>
+                      </div>
 
-              <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1rem" }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedLead(null);
-                    setEditingMessage(null);
-                  }}
-                  style={{
-                    padding: "0.5rem 1rem",
-                    border: "1px solid var(--border)",
-                    borderRadius: "8px",
-                    background: "transparent",
-                    cursor: "pointer",
-                  }}
-                >
-                  Close
-                </button>
-
-                {!editingMessage.sentAt && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleSaveMessageEdits}
-                      style={{
-                        padding: "0.5rem 1.25rem",
-                        background: "#4f46e5",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "8px",
-                        cursor: "pointer",
-                        fontWeight: 500,
-                      }}
-                    >
-                      💾 Save Changes
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSendSingleEmail(editingMessage.id)}
-                      disabled={loading}
-                      style={{
-                        padding: "0.5rem 1.25rem",
-                        background: "#059669",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "8px",
-                        cursor: "pointer",
-                        fontWeight: 500,
-                        opacity: loading ? 0.6 : 1,
-                      }}
-                    >
-                      🚀 Send Now
-                    </button>
-                  </>
-                )}
-              </div>
+                      <div>
+                        <strong>Extracted ATS Text Preview:</strong>
+                        <div style={{ maxHeight: "200px", overflowY: "auto", padding: "0.75rem", background: "#f8fafc", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "0.82rem", color: "#475569", whiteSpace: "pre-wrap" }}>
+                          {selected.parsedText}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div style={{ color: "#64748b", fontStyle: "italic" }}>Select a resume from the list to preview parsed parameters.</div>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* 6. SECURITY AUTHENTICATION PASSCODE MODAL */}
-      {showAuthModal && (
-        <div 
-          className="glass-modal-overlay" 
-          style={{ 
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            background: "rgba(15, 23, 42, 0.4)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999,
-          }}
-        >
-          <div 
-            className="glass-modal-content" 
-            style={{ 
-              width: "420px", 
-              background: "rgba(255, 255, 255, 0.95)",
-              border: "1px solid rgba(229, 231, 235, 0.5)",
-              borderRadius: "20px",
-              boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
-              padding: "2rem",
-              display: "flex",
-              flexDirection: "column",
-              gap: "1.5rem",
-            }}
-          >
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: "2.5rem", marginBottom: "0.5rem" }}>🔒</div>
-              <h3 style={{ fontSize: "1.35rem", fontWeight: 700, color: "#1e293b", margin: 0 }}>Security Verification</h3>
-              <p style={{ fontSize: "0.88rem", color: "#64748b", marginTop: "0.5rem", lineHeight: 1.4 }}>
-                A secure passcode is required to send emails and manage outreach campaigns from your account.
-              </p>
+      {/* ==================== TAB 4: MANUAL JOBS BOARD ==================== */}
+      {activeTab === "jobs" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h2 style={{ fontSize: "1.3rem", fontWeight: 700, margin: 0 }}>Target Job Postings</h2>
+              <p style={{ margin: "2px 0 0", fontSize: "0.85rem", color: "#64748b" }}>Track specific roles to bind as context for AI generations</p>
             </div>
+            <button 
+              onClick={() => setShowAddJobModal(true)}
+              style={{
+                padding: "0.6rem 1.25rem",
+                background: "var(--accent)",
+                color: "white",
+                border: "none",
+                borderRadius: "10px",
+                fontWeight: 600,
+                fontSize: "0.9rem",
+                cursor: "pointer"
+              }}
+            >
+              ➕ Add Job Manually
+            </button>
+          </div>
 
-            <form onSubmit={handleAuthSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "#475569", marginBottom: "6px" }}>
-                  Enter Security Passcode
-                </label>
-                <div style={{ display: "flex", position: "relative" }}>
-                  <input
-                    type={showPasscodeText ? "text" : "password"}
-                    placeholder="••••••••••••"
-                    value={passcodeInput}
-                    onChange={(e) => setPasscodeInput(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "0.7rem 2.5rem 0.7rem 0.9rem",
-                      borderRadius: "10px",
-                      border: "1px solid #cbd5e1",
-                      fontSize: "0.95rem",
-                      outline: "none",
+          {manualJobs.length === 0 ? (
+            <div style={{ padding: "4rem", textAlign: "center", background: "#f8fafc", border: "1px dashed var(--border)", borderRadius: "16px" }}>
+              <h3>No tracked jobs listed yet</h3>
+              <p style={{ fontSize: "0.9rem", color: "#64748b" }}>Create manual target postings to dynamically drive context for founder outreach and referral messages.</p>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "1.25rem" }}>
+              {manualJobs.map((j) => (
+                <div 
+                  key={j.id}
+                  style={{
+                    background: "white",
+                    border: "1px solid var(--border)",
+                    borderRadius: "16px",
+                    padding: "1.25rem",
+                    boxShadow: "var(--shadow)",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    gap: "1rem"
+                  }}
+                >
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: "1.1rem", color: "#1e293b", fontWeight: 700 }}>{j.title}</h3>
+                    <strong style={{ display: "block", color: "#64748b", fontSize: "0.9rem", marginTop: "4px" }}>{j.company}</strong>
+                    
+                    {j.applyUrl && (
+                      <a href={j.applyUrl} target="_blank" rel="noreferrer" style={{ fontSize: "0.78rem", color: "#4f46e5", display: "inline-block", marginTop: "6px" }}>
+                        View Original Posting Link ↗
+                      </a>
+                    )}
+
+                    <div style={{ fontSize: "0.82rem", color: "#475569", marginTop: "10px", maxHeight: "100px", overflowY: "auto", padding: "6px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #f1f5f9" }}>
+                      {j.description || "No JD specified."}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button 
+                      onClick={() => handleDeleteJob(j.id)}
+                      style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer" }}
+                    >
+                      Delete Role
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ==================== TAB 5: PROMPT TEMPLATES ==================== */}
+      {activeTab === "templates" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h2 style={{ fontSize: "1.3rem", fontWeight: 700, margin: 0 }}>AI Prompt Templates</h2>
+              <p style={{ margin: "2px 0 0", fontSize: "0.85rem", color: "#64748b" }}>Tune and tweak customized prompting guidelines for outreach styles</p>
+            </div>
+            <button 
+              onClick={() => {
+                setTemplateName("");
+                setTemplatePrompt("");
+                setEditingTemplateId(null);
+                setShowTemplateModal(true);
+              }}
+              style={{
+                padding: "0.6rem 1.25rem",
+                background: "var(--accent)",
+                color: "white",
+                border: "none",
+                borderRadius: "10px",
+                fontWeight: 600,
+                fontSize: "0.9rem",
+                cursor: "pointer"
+              }}
+            >
+              ➕ Create Prompt Template
+            </button>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "1.25rem" }}>
+            {templates.map((t) => (
+              <div 
+                key={t.id}
+                style={{
+                  background: "white",
+                  border: "1px solid var(--border)",
+                  borderRadius: "16px",
+                  padding: "1.25rem",
+                  boxShadow: "var(--shadow)",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  gap: "1rem"
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700 }}>{t.name}</h3>
+                    <span style={{ fontSize: "0.68rem", background: "#f3e8ff", color: "#7e22ce", padding: "2px 8px", borderRadius: "999px", fontWeight: 700 }}>{t.type}</span>
+                  </div>
+                  
+                  <div style={{ fontSize: "0.82rem", color: "#475569", marginTop: "10px", height: "120px", overflowY: "auto", padding: "8px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #f1f5f9" }}>
+                    {t.prompt}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                  <button 
+                    onClick={() => {
+                      setTemplateName(t.name);
+                      setTemplatePrompt(t.prompt);
+                      setTemplateType(t.type);
+                      setEditingTemplateId(t.id);
+                      setShowTemplateModal(true);
                     }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPasscodeText(!showPasscodeText)}
-                    style={{
-                      position: "absolute",
-                      right: "10px",
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: "1.1rem",
-                      color: "#64748b",
-                      padding: "4px",
-                    }}
-                    title={showPasscodeText ? "Hide passcode" : "Show passcode"}
+                    style={{ background: "transparent", border: "none", color: "#4f46e5", cursor: "pointer", fontSize: "0.85rem", fontWeight: 600 }}
                   >
-                    {showPasscodeText ? "👁️" : "👁️‍🗨️"}
+                    Edit Guidelines
                   </button>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-              {authError && (
-                <div 
-                  style={{ 
-                    color: "#ef4444", 
-                    fontSize: "0.8rem", 
-                    fontWeight: 500,
-                    background: "#fef2f2",
-                    padding: "0.5rem 0.75rem",
-                    borderRadius: "8px",
-                    border: "1px solid #fee2e2",
-                    lineHeight: 1.3,
+      {/* ==================== TAB 6: GENERATION QUEUE ==================== */}
+      {activeTab === "generation" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          <div>
+            <h2 style={{ fontSize: "1.3rem", fontWeight: 700, margin: 0 }}>Redis Queue Status (BullMQ)</h2>
+            <p style={{ margin: "2px 0 0", fontSize: "0.85rem", color: "#64748b" }}>Monitor background AI bulk generation tasks</p>
+          </div>
+
+          {genQueueJobs.length === 0 ? (
+            <div style={{ padding: "4rem", textAlign: "center", background: "#f8fafc", border: "1px dashed var(--border)", borderRadius: "16px" }}>
+              No background jobs enqueued. Go to the "Target Profiles" tab, select profiles, and dispatch generations.
+            </div>
+          ) : (
+            <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: "16px", overflow: "hidden", boxShadow: "var(--shadow)" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#f8fafc", borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                    <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Target Details</th>
+                    <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Template used</th>
+                    <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Triggered At</th>
+                    <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>BullMQ Status</th>
+                    <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Result Logs / Errors</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {genQueueJobs.map((j) => {
+                    let statusColor = "#475569";
+                    let statusBg = "#f1f5f9";
+                    let glow = false;
+
+                    switch (j.status) {
+                      case "PENDING":
+                        statusColor = "#d97706";
+                        statusBg = "#fef3c7";
+                        break;
+                      case "GENERATING":
+                        statusColor = "#7e22ce";
+                        statusBg = "#f3e8ff";
+                        glow = true;
+                        break;
+                      case "COMPLETED":
+                        statusColor = "#047857";
+                        statusBg = "#d1fae5";
+                        break;
+                      case "FAILED":
+                        statusColor = "#b91c1c";
+                        statusBg = "#fee2e2";
+                        break;
+                    }
+
+                    return (
+                      <tr key={j.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                        <td style={{ padding: "1rem" }}>
+                          <strong style={{ display: "block" }}>{j.profile.name}</strong>
+                          <span style={{ fontSize: "0.78rem", color: "#64748b" }}>{j.profile.role} @ {j.profile.company}</span>
+                        </td>
+                        <td style={{ padding: "1rem", fontSize: "0.88rem" }}>{j.template.name}</td>
+                        <td style={{ padding: "1rem", fontSize: "0.85rem", color: "#64748b" }}>
+                          {new Date(j.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </td>
+                        <td style={{ padding: "1rem" }}>
+                          <span
+                            style={{
+                              background: statusBg,
+                              color: statusColor,
+                              padding: "4px 10px",
+                              borderRadius: "999px",
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              animation: glow ? "pulseGlow 1.5s infinite alternate" : "none"
+                            }}
+                          >
+                            {j.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: "1rem", fontSize: "0.82rem", maxWidth: "250px", wordBreak: "break-word" }}>
+                          {j.status === "COMPLETED" ? (
+                            <span style={{ color: "#10b981", fontWeight: 600 }}>Message compiled in draft queue ✓</span>
+                          ) : j.status === "FAILED" ? (
+                            <span style={{ color: "#ef4444" }}>⚠️ {j.error || "Generation crashed."}</span>
+                          ) : (
+                            <span style={{ color: "#64748b", fontStyle: "italic" }}>Running background prompt...</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ==================== TAB 7: APPROVAL QUEUE & OUTBOX ==================== */}
+      {activeTab === "outbox" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          {/* Section 1: Approval Workflow Queue */}
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+              <div>
+                <h2 style={{ fontSize: "1.3rem", fontWeight: 700, margin: 0 }}>Human Review / Approval Queue</h2>
+                <p style={{ margin: "2px 0 0", fontSize: "0.85rem", color: "#64748b" }}>Edit and approve generated messages before transmission</p>
+              </div>
+
+              {approvalQueue.length > 0 && (
+                <button
+                  onClick={handleTriggerSMTPDispatch}
+                  style={{
+                    padding: "0.65rem 1.5rem",
+                    background: "linear-gradient(to right, #059669, #10b981)",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "10px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    boxShadow: "0 4px 12px rgba(16,185,129,0.2)"
                   }}
                 >
-                  ⚠️ {authError}
+                  ✉️ Dispatch Approved Outbox
+                </button>
+              )}
+            </div>
+
+            {approvalQueue.length === 0 ? (
+              <div style={{ padding: "3rem", textAlign: "center", background: "#f8fafc", border: "1px dashed var(--border)", borderRadius: "16px", marginBottom: "2rem" }}>
+                <h3 style={{ color: "#475569" }}>Approval Queue is empty</h3>
+                <p style={{ fontSize: "0.9rem", color: "#64748b" }}>All enqueued drafts have been processed or approved. Launch new bulk generations to fill reviews.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", marginBottom: "2.5rem" }}>
+                {approvalQueue.map((draft) => {
+                  const isEditing = editingDraftId === draft.id;
+                  return (
+                    <div 
+                      key={draft.id}
+                      style={{
+                        background: "white",
+                        border: "1px solid var(--border)",
+                        borderRadius: "16px",
+                        boxShadow: "var(--shadow)",
+                        overflow: "hidden",
+                        display: "grid",
+                        gridTemplateColumns: "240px 1fr"
+                      }}
+                    >
+                      {/* Left: Profile metadata context info card */}
+                      <div style={{ background: "#f8fafc", padding: "1.5rem", borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "1rem" }}>
+                        <div>
+                          <span style={{ fontSize: "0.72rem", textTransform: "uppercase", color: "#64748b", fontWeight: 700 }}>Recipient</span>
+                          <strong style={{ display: "block", fontSize: "1.1rem", color: "#1e293b", marginTop: "2px" }}>{draft.profile.name}</strong>
+                          <span style={{ fontSize: "0.85rem", color: "#475569" }}>{draft.profile.role}</span>
+                          <span style={{ display: "block", fontSize: "0.85rem", color: "#475569", fontWeight: 600 }}>{draft.profile.company}</span>
+                        </div>
+
+                        <div>
+                          <span style={{ fontSize: "0.72rem", textTransform: "uppercase", color: "#64748b", fontWeight: 700 }}>Email Address</span>
+                          <span style={{ display: "block", fontSize: "0.82rem", wordBreak: "break-all" }}>{draft.profile.email || "No Email Provided"}</span>
+                        </div>
+
+                        <div>
+                          <span style={{ fontSize: "0.72rem", textTransform: "uppercase", color: "#64748b", fontWeight: 700 }}>Draft Status</span>
+                          <span style={{ display: "inline-block", background: "#fef3c7", color: "#d97706", fontSize: "0.75rem", padding: "2px 8px", borderRadius: "999px", fontWeight: 700, marginTop: "2px" }}>
+                            {draft.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Right: Message editor panel */}
+                      <div style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+                        {isEditing ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                            <div>
+                              <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "#475569", marginBottom: "4px" }}>Email Subject</label>
+                              <input 
+                                type="text" 
+                                value={editingSubject} 
+                                onChange={(e) => setEditingSubject(e.target.value)}
+                                style={{ width: "100%", padding: "0.6rem", border: "1px solid var(--border)", borderRadius: "8px", outline: "none", fontSize: "0.95rem" }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "#475569", marginBottom: "4px" }}>Email Copy</label>
+                              <textarea
+                                value={editingContent}
+                                onChange={(e) => setEditingContent(e.target.value)}
+                                rows={8}
+                                style={{ width: "100%", padding: "0.75rem", border: "1px solid var(--border)", borderRadius: "8px", outline: "none", fontSize: "0.92rem", lineHeight: 1.4, fontFamily: "inherit" }}
+                              />
+                            </div>
+
+                            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                              <button 
+                                onClick={() => setEditingDraftId(null)}
+                                style={{ padding: "0.4rem 1rem", background: "white", border: "1px solid var(--border)", borderRadius: "8px", cursor: "pointer" }}
+                              >
+                                Cancel
+                              </button>
+                              <button 
+                                onClick={() => handleSaveDraftEdits(draft.id)}
+                                style={{ padding: "0.4rem 1.25rem", background: "#4f46e5", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }}
+                              >
+                                Save Changes
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "1rem", height: "100%", justifyContent: "space-between" }}>
+                            <div>
+                              <div style={{ borderBottom: "1px solid #f1f5f9", paddingBottom: "8px", marginBottom: "8px" }}>
+                                <strong>Subject:</strong> {draft.subject}
+                              </div>
+                              <div style={{ fontSize: "0.92rem", color: "#374151", whiteSpace: "pre-wrap", lineHeight: 1.4 }}>
+                                {draft.content}
+                              </div>
+                            </div>
+
+                            {/* Actions block */}
+                            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", borderTop: "1px solid #f1f5f9", paddingTop: "10px", marginTop: "auto" }}>
+                              <button 
+                                onClick={() => handleOpenEditDraft(draft)}
+                                style={{ padding: "0.4rem 1rem", background: "white", border: "1px solid var(--border)", borderRadius: "8px", cursor: "pointer", fontSize: "0.85rem", fontWeight: 500 }}
+                              >
+                                📝 Edit Draft
+                              </button>
+                              <button 
+                                onClick={() => handleRejectMessage(draft.id)}
+                                style={{ padding: "0.4rem 1rem", background: "#fee2e2", color: "#ef4444", border: "1px solid #fecaca", borderRadius: "8px", cursor: "pointer", fontSize: "0.85rem", fontWeight: 500 }}
+                              >
+                                ✕ Reject
+                              </button>
+                              <button 
+                                onClick={() => handleApproveMessage(draft.id)}
+                                style={{ padding: "0.4rem 1.25rem", background: "#10b981", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontSize: "0.85rem", fontWeight: 600 }}
+                              >
+                                ✓ Approve Draft
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Section 2: Outbox History Logs */}
+          <div>
+            <h2 style={{ fontSize: "1.2rem", fontWeight: 700, margin: "0 0 1rem 0" }}>Outbox Logs & Sending Queue</h2>
+            
+            {outboxMessages.length === 0 ? (
+              <div style={{ padding: "2rem", textAlign: "center", background: "#f8fafc", borderRadius: "12px", border: "1px dashed var(--border)" }}>
+                No sent logs available. Approved emails appear here when transmitted.
+              </div>
+            ) : (
+              <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: "16px", overflow: "hidden", boxShadow: "var(--shadow)" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ background: "#f8fafc", borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                      <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Target Recipient</th>
+                      <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Email Subject</th>
+                      <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Channel</th>
+                      <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Status</th>
+                      <th style={{ padding: "1rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Delivered Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {outboxMessages.map((msg) => {
+                      let statusBg = "#f1f5f9";
+                      let statusColor = "#475569";
+                      let glow = false;
+
+                      switch (msg.status) {
+                        case "APPROVED":
+                          statusBg = "#e0e7ff";
+                          statusColor = "#4338ca";
+                          break;
+                        case "SENDING":
+                          statusBg = "#ffedd5";
+                          statusColor = "#c2410c";
+                          glow = true;
+                          break;
+                        case "SENT":
+                          statusBg = "#d1fae5";
+                          statusColor = "#047857";
+                          break;
+                        case "FAILED":
+                          statusBg = "#fee2e2";
+                          statusColor = "#b91c1c";
+                          break;
+                      }
+
+                      return (
+                        <tr key={msg.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                          <td style={{ padding: "1rem" }}>
+                            <strong style={{ display: "block" }}>{msg.profile.name}</strong>
+                            <span style={{ fontSize: "0.78rem", color: "#64748b" }}>{msg.profile.email}</span>
+                          </td>
+                          <td style={{ padding: "1rem", fontSize: "0.88rem" }}>{msg.subject}</td>
+                          <td style={{ padding: "1rem", fontSize: "0.85rem" }}>
+                            <span style={{ background: "#f1f5f9", padding: "2px 8px", borderRadius: "999px", fontSize: "0.72rem", fontWeight: 600 }}>{msg.channel}</span>
+                          </td>
+                          <td style={{ padding: "1rem" }}>
+                            <span style={{ background: statusBg, color: statusColor, padding: "4px 10px", borderRadius: "999px", fontSize: "0.75rem", fontWeight: 700, animation: glow ? "pulseGlow 1s infinite alternate" : "none" }}>
+                              {msg.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: "1rem", fontSize: "0.85rem", color: "#64748b" }}>
+                            {msg.sentAt ? new Date(msg.sentAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== G. MODALS & DRAWERS DEFINITIONS ==================== */}
+
+      {/* Add Profile & Importer Modal */}
+      {showAddProfileModal && (
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(15,23,42,0.4)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
+          <div style={{ width: "560px", background: "white", borderRadius: "20px", padding: "2rem", display: "flex", flexDirection: "column", gap: "1.5rem", boxShadow: "0 20px 25px rgba(0,0,0,0.15)", maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700 }}>Import Target Profiles</h3>
+              <button onClick={() => setShowAddProfileModal(false)} style={{ background: "transparent", border: "none", fontSize: "1.5rem", cursor: "pointer" }}>&times;</button>
+            </div>
+
+            <form onSubmit={handleAddProfile} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+              {/* Selector to switch between Single and Bulk */}
+              <div style={{ display: "flex", gap: "1rem", borderBottom: "1px solid #e2e8f0", paddingBottom: "10px" }}>
+                <button 
+                  type="button" 
+                  onClick={() => setProfileBulkInput("")}
+                  style={{ background: !profileBulkInput ? "#4f46e5" : "transparent", color: !profileBulkInput ? "white" : "#475569", border: "none", padding: "6px 12px", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }}
+                >
+                  Single Form Add
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setProfileBulkInput("Name,Role,Company,LinkedIn,Email,Notes\nShivam,CTO,Morphie,,shivam@morphie.co,")}
+                  style={{ background: profileBulkInput ? "#4f46e5" : "transparent", color: profileBulkInput ? "white" : "#475569", border: "none", padding: "6px 12px", borderRadius: "8px", cursor: "pointer", fontWeight: 600 }}
+                >
+                  Bulk CSV/JSON paste
+                </button>
+              </div>
+
+              {profileBulkInput ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <button type="button" onClick={() => setImportFormat("csv")} style={{ background: importFormat === "csv" ? "#1e293b" : "transparent", color: importFormat === "csv" ? "white" : "#475569", border: "1px solid #cbd5e1", padding: "4px 10px", borderRadius: "6px", cursor: "pointer" }}>CSV Format</button>
+                    <button type="button" onClick={() => setImportFormat("json")} style={{ background: importFormat === "json" ? "#1e293b" : "transparent", color: importFormat === "json" ? "white" : "#475569", border: "1px solid #cbd5e1", padding: "4px 10px", borderRadius: "6px", cursor: "pointer" }}>JSON Array Format</button>
+                  </div>
+                  <textarea
+                    rows={8}
+                    placeholder={importFormat === "csv" ? "Name,Role,Company,LinkedIn,Email,Notes\nShivam,SDE,Snapmint,,shivam@snapmint.com,Ref by John\n..." : '[\n  { "name": "Shivam", "role": "SDE", "company": "Snapmint", "email": "shivam@snapmint.com" }\n]'}
+                    value={profileBulkInput}
+                    onChange={(e) => setProfileBulkInput(e.target.value)}
+                    style={{ width: "100%", padding: "0.75rem", border: "1px solid #cbd5e1", borderRadius: "8px", outline: "none", fontSize: "0.88rem", fontFamily: "monospace" }}
+                  />
+                </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Full Name *</label>
+                    <input type="text" value={profileName} onChange={(e) => setProfileName(e.target.value)} style={{ padding: "0.5rem", border: "1px solid #cbd5e1", borderRadius: "8px" }} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Target Role / Title *</label>
+                    <input type="text" value={profileRole} onChange={(e) => setProfileRole(e.target.value)} style={{ padding: "0.5rem", border: "1px solid #cbd5e1", borderRadius: "8px" }} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Company *</label>
+                    <input type="text" value={profileCompany} onChange={(e) => setProfileCompany(e.target.value)} style={{ padding: "0.5rem", border: "1px solid #cbd5e1", borderRadius: "8px" }} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Email Address</label>
+                    <input type="email" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} style={{ padding: "0.5rem", border: "1px solid #cbd5e1", borderRadius: "8px" }} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", gridColumn: "span 2" }}>
+                    <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>LinkedIn URL</label>
+                    <input type="url" value={profileLinkedin} onChange={(e) => setProfileLinkedin(e.target.value)} style={{ padding: "0.5rem", border: "1px solid #cbd5e1", borderRadius: "8px" }} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", gridColumn: "span 2" }}>
+                    <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Skills / Focus Tags (comma separated)</label>
+                    <input type="text" placeholder="e.g. Backend, React, Fintech" value={profileTagsInput} onChange={(e) => setProfileTagsInput(e.target.value)} style={{ padding: "0.5rem", border: "1px solid #cbd5e1", borderRadius: "8px" }} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", gridColumn: "span 2" }}>
+                    <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Notes & Context</label>
+                    <textarea rows={3} placeholder="e.g. Previously worked at Coinbase, active on open source..." value={profileNotes} onChange={(e) => setProfileNotes(e.target.value)} style={{ padding: "0.5rem", border: "1px solid #cbd5e1", borderRadius: "8px", outline: "none" }} />
+                  </div>
                 </div>
               )}
 
-              <button
-                type="submit"
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  background: "linear-gradient(to right, #4f46e5, #6366f1)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "10px",
-                  fontSize: "0.95rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  boxShadow: "0 4px 6px -1px rgb(79 70 229 / 0.1)",
-                }}
-              >
-                Authenticate Session
-              </button>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", marginTop: "1rem" }}>
+                <button type="button" onClick={() => setShowAddProfileModal(false)} style={{ flex: 1, padding: "0.6rem", background: "white", border: "1px solid #cbd5e1", borderRadius: "10px", cursor: "pointer" }}>Cancel</button>
+                <button type="submit" disabled={loading} style={{ flex: 1, padding: "0.6rem", background: "#4f46e5", color: "white", border: "none", borderRadius: "10px", cursor: "pointer", fontWeight: 600 }}>
+                  {loading ? "Importing..." : "Save Target Profiles"}
+                </button>
+              </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Add Resume Modal */}
+      {showAddResumeModal && (
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(15,23,42,0.4)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
+          <div style={{ width: "420px", background: "white", borderRadius: "20px", padding: "2rem", display: "flex", flexDirection: "column", gap: "1.5rem", boxShadow: "0 20px 25px rgba(0,0,0,0.15)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>Upload Resume PDF</h3>
+              <button onClick={() => setShowAddResumeModal(false)} style={{ background: "transparent", border: "none", fontSize: "1.5rem", cursor: "pointer" }}>&times;</button>
+            </div>
+
+            <form onSubmit={handleUploadResume} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Resume Label / Title *</label>
+                <input type="text" placeholder="e.g. Backend SDE Resume, AI Intern Resume" value={resumeTitle} onChange={(e) => setResumeTitle(e.target.value)} style={{ padding: "0.5rem", border: "1px solid #cbd5e1", borderRadius: "8px" }} />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>PDF File *</label>
+                <input 
+                  type="file" 
+                  accept="application/pdf" 
+                  onChange={(e) => setResumeFile(e.target.files?.[0] || null)} 
+                  style={{ padding: "0.5rem", border: "1px dashed #cbd5e1", borderRadius: "8px", background: "#f8fafc" }} 
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "1rem" }}>
+                <button type="button" onClick={() => setShowAddResumeModal(false)} style={{ flex: 1, padding: "0.6rem", background: "white", border: "1px solid #cbd5e1", borderRadius: "10px", cursor: "pointer" }}>Cancel</button>
+                <button type="submit" disabled={loading} style={{ flex: 1, padding: "0.6rem", background: "#4f46e5", color: "white", border: "none", borderRadius: "10px", cursor: "pointer", fontWeight: 600 }}>
+                  {loading ? "Parsing PDF..." : "Upload & Parse Context"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Job Modal */}
+      {showAddJobModal && (
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(15,23,42,0.4)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
+          <div style={{ width: "460px", background: "white", borderRadius: "20px", padding: "2rem", display: "flex", flexDirection: "column", gap: "1.5rem", boxShadow: "0 20px 25px rgba(0,0,0,0.15)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>Add Manual Target Job</h3>
+              <button onClick={() => setShowAddJobModal(false)} style={{ background: "transparent", border: "none", fontSize: "1.5rem", cursor: "pointer" }}>&times;</button>
+            </div>
+
+            <form onSubmit={handleAddJob} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Job Title *</label>
+                <input type="text" placeholder="e.g. Backend Engineer Intern" value={jobTitleInput} onChange={(e) => setJobTitleInput(e.target.value)} style={{ padding: "0.5rem", border: "1px solid #cbd5e1", borderRadius: "8px" }} />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Company Name *</label>
+                <input type="text" placeholder="e.g. Stripe" value={jobCompanyInput} onChange={(e) => setJobCompanyInput(e.target.value)} style={{ padding: "0.5rem", border: "1px solid #cbd5e1", borderRadius: "8px" }} />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Original Posting URL</label>
+                <input type="url" placeholder="https://stripe.com/careers/jobs/..." value={jobLinkInput} onChange={(e) => setJobLinkInput(e.target.value)} style={{ padding: "0.5rem", border: "1px solid #cbd5e1", borderRadius: "8px" }} />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Job Description Details</label>
+                <textarea rows={4} placeholder="Requirements, key stacks, experience expectations..." value={jobDescriptionInput} onChange={(e) => setJobDescriptionInput(e.target.value)} style={{ padding: "0.5rem", border: "1px solid #cbd5e1", borderRadius: "8px", outline: "none" }} />
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "1rem" }}>
+                <button type="button" onClick={() => setShowAddJobModal(false)} style={{ flex: 1, padding: "0.6rem", background: "white", border: "1px solid #cbd5e1", borderRadius: "10px", cursor: "pointer" }}>Cancel</button>
+                <button type="submit" disabled={loading} style={{ flex: 1, padding: "0.6rem", background: "#4f46e5", color: "white", border: "none", borderRadius: "10px", cursor: "pointer", fontWeight: 600 }}>
+                  Save Job spec
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit/Create Templates Modal */}
+      {showTemplateModal && (
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(15,23,42,0.4)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
+          <div style={{ width: "500px", background: "white", borderRadius: "20px", padding: "2rem", display: "flex", flexDirection: "column", gap: "1.5rem", boxShadow: "0 20px 25px rgba(0,0,0,0.15)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 700 }}>{editingTemplateId ? "Edit Prompt Guidelines" : "Create Prompt Template"}</h3>
+              <button onClick={() => setShowTemplateModal(false)} style={{ background: "transparent", border: "none", fontSize: "1.5rem", cursor: "pointer" }}>&times;</button>
+            </div>
+
+            <form onSubmit={handleSaveTemplate} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Template Label</label>
+                <input type="text" placeholder="e.g. SDE Referral Pitch" value={templateName} onChange={(e) => setTemplateName(e.target.value)} style={{ padding: "0.5rem", border: "1px solid #cbd5e1", borderRadius: "8px" }} />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>Outreach Objective / Type</label>
+                <select
+                  value={templateType}
+                  onChange={(e) => setTemplateType(e.target.value)}
+                  style={{ padding: "0.5rem", border: "1px solid #cbd5e1", borderRadius: "8px" }}
+                >
+                  <option value="REFERRAL">Referral Request</option>
+                  <option value="NETWORKING">Networking Connect</option>
+                  <option value="FEEDBACK">Profile Feedback</option>
+                  <option value="FOUNDER">CTO/Founder Outreach</option>
+                </select>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "0.82rem", fontWeight: 600 }}>AI Guidelines & Instructions</label>
+                <textarea rows={6} placeholder="Instruct the LLM on writing style, formatting, constraints, mapping keys..." value={templatePrompt} onChange={(e) => setTemplatePrompt(e.target.value)} style={{ padding: "0.5rem", border: "1px solid #cbd5e1", borderRadius: "8px", outline: "none", fontSize: "0.88rem" }} />
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "1rem" }}>
+                <button type="button" onClick={() => setShowTemplateModal(false)} style={{ flex: 1, padding: "0.6rem", background: "white", border: "1px solid #cbd5e1", borderRadius: "10px", cursor: "pointer" }}>Cancel</button>
+                <button type="submit" disabled={loading} style={{ flex: 1, padding: "0.6rem", background: "#4f46e5", color: "white", border: "none", borderRadius: "10px", cursor: "pointer", fontWeight: 600 }}>
+                  Save Prompt
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Global CSS Styles Injection */}
+      <style>{`
+        @keyframes pulseGlow {
+          from {
+            opacity: 0.8;
+            box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4);
+          }
+          to {
+            opacity: 1;
+            box-shadow: 0 0 12px 6px rgba(79, 70, 229, 0.15);
+          }
+        }
+        .outreach-flow-app {
+          animation: fadeInUp 0.4s ease-out;
+        }
+      `}</style>
     </div>
   );
 }
-

@@ -4,7 +4,9 @@ import { startFetchScheduler, triggerFetchJob } from "./scheduler/fetch.schedule
 import { startCleanupScheduler, triggerCleanupJob } from "./scheduler/cleanup.scheduler.js";
 import { resumeWorker } from "./queues/resume.worker.js";
 import { applyWorker } from "./queues/apply.worker.js";
+import { outreachWorker } from "./queues/outreach.worker.js";
 import { outreachRouter } from "./routes/outreach.routes.js";
+import { outreachFlowRouter } from "./routes/outreach-flow.routes.js";
 import { requireAuth } from "./routes/auth.middleware.js";
 
 
@@ -32,6 +34,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(outreachRouter);
+app.use(outreachFlowRouter);
 
 
 /**
@@ -122,6 +125,7 @@ async function bootstrap() {
       console.log(`[Express Health Server] Initializing background workers...`);
       console.log(`[Express Health Server] Resume Worker active: ${resumeWorker.name}`);
       console.log(`[Express Health Server] Apply Worker active: ${applyWorker.name}`);
+      console.log(`[Express Health Server] Outreach Worker active: ${outreachWorker.name}`);
     });
 
     // Start fetching scheduler (Runs immediately on boot, then every 3 hours)

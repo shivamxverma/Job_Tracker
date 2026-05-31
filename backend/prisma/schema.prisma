@@ -100,3 +100,104 @@ model Message {
   @@map("messages")
 }
 
+model Resume {
+  id          String   @id @default(cuid())
+  title       String
+  fileUrl     String?  @map("file_url")
+  parsedText  String   @map("parsed_text")
+  skills      String[]
+  experience  String?  // Rich text/plain text or JSON
+  projects    String?  // Rich text/plain text or JSON
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  generationJobs GenerationJob[]
+
+  @@map("resumes")
+}
+
+model Profile {
+  id          String   @id @default(cuid())
+  name        String
+  role        String
+  company     String
+  linkedinUrl String?  @map("linkedin_url")
+  email       String?
+  notes       String?
+  source      String   @default("MANUAL")
+  tags        String[]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  generationJobs      GenerationJob[]
+  outboundMessages    OutboundMessage[]
+  conversationTracker ConversationTracker?
+
+  @@map("profiles")
+}
+
+model Template {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   // REFERRAL, NETWORKING, FEEDBACK, FOUNDER
+  prompt    String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  generationJobs GenerationJob[]
+
+  @@map("templates")
+}
+
+model GenerationJob {
+  id               String    @id @default(cuid())
+  profileId        String    @map("profile_id")
+  resumeId         String    @map("resume_id")
+  jobId            String?   @map("job_id")
+  templateId       String    @map("template_id")
+  status           String    @default("PENDING") // PENDING, GENERATING, COMPLETED, FAILED
+  generatedSubject String?   @map("generated_subject")
+  generatedMessage String?   @map("generated_message")
+  error            String?
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  profile  Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  resume   Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@index([resumeId])
+  @@index([templateId])
+  @@map("generation_jobs")
+}
+
+model OutboundMessage {
+  id          String    @id @default(cuid())
+  profileId   String    @map("profile_id")
+  channel     String    @default("EMAIL") // EMAIL, LINKEDIN, etc.
+  subject     String
+  content     String
+  status      String    @default("DRAFT") // DRAFT, APPROVED, REJECTED, EDITED, PENDING, SENDING, SENT, FAILED, REPLIED
+  sentAt      DateTime? @map("sent_at")
+  deliveredAt DateTime? @map("delivered_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@index([status])
+  @@map("outbound_messages")
+}
+
+model ConversationTracker {
+  id              String    @id @default(cuid())
+  profileId       String    @unique @map("profile_id")
+  status          String    @default("ACTIVE")
+  lastContactedAt DateTime? @map("last_contacted_at")
+  replyReceived   Boolean   @default(false) @map("reply_received")
+  positiveResponse Boolean  @default(false) @map("positive_response")
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("conversation_trackers")
+}
+

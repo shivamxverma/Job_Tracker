@@ -39,4 +39,9 @@ export const applyQueue = new Queue("auto-apply", {
   connection: redisConnectionOptions,
 });
 
+// Queue 3: Generates contextual personalized outreach and referral emails
+export const outreachQueue = new Queue("outreach-generation", {
+  connection: redisConnectionOptions,
+});
+
 console.log("[Queue Setup] BullMQ Queues initialized successfully.");

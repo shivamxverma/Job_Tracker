@@ -322,4 +322,72 @@ STRICT RULES:
 
     return this.parseJsonResponse<{ companyName: string; recipientEmail: string; jobDescription: string }>(rawResponse);
   }
+
+  /**
+   * Dynamic Outreach Message Generator powered by custom templates
+   */
+  async generateOutreachMessage(
+    profile: { name: string; role: string; company: string; notes?: string | null },
+    resume: { parsedText: string; skills: string[]; experience?: string | null; projects?: string | null },
+    job: { title: string; company: string; description?: string | null } | null,
+    templatePrompt: string,
+    messageType: string
+  ): Promise<GeneratedEmail> {
+    if (!this.openai) {
+      throw new Error("Gemini API Client is not initialized.");
+    }
+
+    const systemPrompt = `You are an expert cold outreach copywriter.
+Your goal is to write a highly compelling, personalized networking or referral email.
+The message MUST be written in the FIRST PERSON perspective ("I", "my", "me") directly from the candidate Shivam Kumar Verma.
+
+STRICT RULES:
+1. Write in the FIRST PERSON as Shivam Kumar Verma. Never write in the third person or say you are writing "on behalf of Shivam".
+2. Ground all experience, achievements, and technical credentials strictly in the candidate's Resume. Do NOT hallucinate credentials.
+3. Keep the body concise, engaging, and clear (around 100-250 words). Avoid dense blocks of text.
+4. Output EXACTLY a valid JSON object with two fields:
+{
+  "subject": "...",
+  "body": "..."
+}
+5. Do NOT include markdown tags around the JSON object.
+6. The outreach message type is: ${messageType}.
+7. Follow these base prompt instructions for writing style and target objective:
+${templatePrompt}`;
+
+    const userPrompt = `=== CANDIDATE CONTEXT ===
+Name: Shivam Kumar Verma
+Skills: ${resume.skills.join(", ")}
+Experience Summary: ${resume.experience || "Not specified"}
+Projects: ${resume.projects || "Not specified"}
+Full Resume Text:
+${resume.parsedText}
+
+=== TARGET PROFILE CONTEXT ===
+Name: ${profile.name}
+Role: ${profile.role}
+Company: ${profile.company}
+Recruiter/Employee Notes: ${profile.notes || "None"}
+
+=== TARGET JOB CONTEXT ===
+${job ? `Job Title: ${job.title}
+Job Company: ${job.company}
+Job Description: ${job.description || "None"}` : "No specific job posting attached."}
+`;
+
+    const rawResponse = await this.safeCall(async () => {
+      const response = await this.openai!.chat.completions.create({
+        model: "gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.25,
+      });
+      return response.choices[0]?.message?.content || "";
+    });
+
+    return this.parseJsonResponse<GeneratedEmail>(rawResponse);
+  }
 }
