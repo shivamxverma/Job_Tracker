@@ -158,7 +158,7 @@ export function OutreachBoard() {
   const [authError, setAuthError] = useState("");
   const [showPasscodeText, setShowPasscodeText] = useState(false);
 
-  const API_BASE = "http://localhost:3000";
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
   // Load API key from env or localStorage
   const getApiKey = () => {
@@ -280,6 +280,7 @@ export function OutreachBoard() {
       setIsAuthenticated(true);
     } catch (err) {
       console.error("OutreachFlow data fetching crash:", err);
+      setIsAuthenticated(false);
     } finally {
       setLoading(false);
     }
