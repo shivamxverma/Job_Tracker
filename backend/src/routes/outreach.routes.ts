@@ -2,8 +2,11 @@ import { Router, Request, Response } from "express";
 import { prisma } from "../services/prisma.js";
 import { GeminiService } from "../services/gemini.service.js";
 import { EmailService } from "../services/email.service.js";
+import { requireAuth } from "./auth.middleware.js";
 
 export const outreachRouter = Router();
+outreachRouter.use(requireAuth);
+
 const geminiService = new GeminiService();
 const emailService = new EmailService();
 

@@ -5,6 +5,8 @@ import { startCleanupScheduler, triggerCleanupJob } from "./scheduler/cleanup.sc
 import { resumeWorker } from "./queues/resume.worker.js";
 import { applyWorker } from "./queues/apply.worker.js";
 import { outreachRouter } from "./routes/outreach.routes.js";
+import { requireAuth } from "./routes/auth.middleware.js";
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -77,7 +79,7 @@ app.get("/health", async (req, res) => {
 /**
  * Manual Trigger Endpoints (for testing & admin manual overrides)
  */
-app.post("/jobs/trigger-crawl", async (req, res) => {
+app.post("/jobs/trigger-crawl", requireAuth, async (req, res) => {
   try {
     console.log("[Admin API] Manual fetch crawl triggered via POST /jobs/trigger-crawl.");
     // Run asynchronously to avoid blocking the HTTP response
@@ -91,7 +93,7 @@ app.post("/jobs/trigger-crawl", async (req, res) => {
   }
 });
 
-app.post("/jobs/trigger-cleanup", async (req, res) => {
+app.post("/jobs/trigger-cleanup", requireAuth, async (req, res) => {
   try {
     console.log("[Admin API] Manual stale job cleanup triggered via POST /jobs/trigger-cleanup.");
     // Run asynchronously to avoid blocking the HTTP response
@@ -104,6 +106,7 @@ app.post("/jobs/trigger-cleanup", async (req, res) => {
     res.status(500).json({ error: "Failed to trigger cleanup" });
   }
 });
+
 
 /**
  * Start Server & Schedulers

@@ -34,6 +34,12 @@ export function OutreachBoard() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
 
+  // Passcode Authentication State
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [passcodeInput, setPasscodeInput] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [showPasscodeText, setShowPasscodeText] = useState(false);
+
   // Image Upload Form
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -54,10 +60,64 @@ export function OutreachBoard() {
   // API base URL pointing to the Express server running on port 3000
   const API_BASE = "http://localhost:3000";
 
+  // Load API key from env or localStorage
+  const getApiKey = () => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("outreach_api_key") || process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "";
+    }
+    return process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "";
+  };
+
+  // Helper wrapper for making authorized backend fetch requests
+  const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+    const key = getApiKey();
+    const headers = {
+      "X-API-Key": key,
+      ...options.headers,
+    };
+
+    const res = await fetch(url, { ...options, headers });
+
+    if (res.status === 401 || res.status === 500) {
+      const clonedRes = res.clone();
+      try {
+        const json = await clonedRes.json();
+        if (
+          json.message?.toLowerCase().includes("api key") ||
+          json.message?.toLowerCase().includes("unauthorized") ||
+          json.message?.toLowerCase().includes("security error")
+        ) {
+          setShowAuthModal(true);
+          setAuthError(json.message);
+        }
+      } catch (e) {
+        setShowAuthModal(true);
+        setAuthError("Unauthorized access or missing server key configuration.");
+      }
+    }
+
+    return res;
+  };
+
+  const handleAuthSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passcodeInput.trim()) {
+      setAuthError("Passcode cannot be empty.");
+      return;
+    }
+    localStorage.setItem("outreach_api_key", passcodeInput.trim());
+    setShowAuthModal(false);
+    setAuthError("");
+    // Instantly trigger leads refetch on successful login
+    setTimeout(() => {
+      fetchLeads();
+    }, 100);
+  };
+
   // Fetch all leads from Express backend
   const fetchLeads = async () => {
     try {
-      const res = await fetch(`${API_BASE}/outreach/leads`);
+      const res = await fetchWithAuth(`${API_BASE}/outreach/leads`);
       const json = await res.json();
       if (json.success) {
         setLeads(json.data);
@@ -66,6 +126,7 @@ export function OutreachBoard() {
       console.error("[OutreachBoard] Failed to fetch leads:", err);
     }
   };
+
 
   useEffect(() => {
     fetchLeads();
@@ -128,7 +189,7 @@ export function OutreachBoard() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/outreach/leads`, {
+      const res = await fetchWithAuth(`${API_BASE}/outreach/leads`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -201,7 +262,7 @@ export function OutreachBoard() {
         }
       }
 
-      const res = await fetch(`${API_BASE}/outreach/leads`, {
+      const res = await fetchWithAuth(`${API_BASE}/outreach/leads`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ leads: parsedLeads }),
@@ -247,7 +308,7 @@ export function OutreachBoard() {
 
     setExtractingImage(true);
     try {
-      const res = await fetch(`${API_BASE}/outreach/leads/extract-image`, {
+      const res = await fetchWithAuth(`${API_BASE}/outreach/leads/extract-image`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -280,7 +341,7 @@ export function OutreachBoard() {
   const handleGenerateAll = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/outreach/generate-all`, { method: "POST" });
+      const res = await fetchWithAuth(`${API_BASE}/outreach/generate-all`, { method: "POST" });
       const json = await res.json();
       alert(json.message);
       fetchLeads();
@@ -296,7 +357,7 @@ export function OutreachBoard() {
   const handleSendAll = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/outreach/send-all`, { method: "POST" });
+      const res = await fetchWithAuth(`${API_BASE}/outreach/send-all`, { method: "POST" });
       const json = await res.json();
       alert(json.message);
       fetchLeads();
@@ -317,7 +378,7 @@ export function OutreachBoard() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/outreach/followups/generate`, {
+      const res = await fetchWithAuth(`${API_BASE}/outreach/followups/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ leadIds: Array.from(selectedIds) }),
@@ -343,7 +404,7 @@ export function OutreachBoard() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/outreach/followups/send`, {
+      const res = await fetchWithAuth(`${API_BASE}/outreach/followups/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ leadIds: Array.from(selectedIds) }),
@@ -367,7 +428,7 @@ export function OutreachBoard() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/outreach/leads/${id}`, { method: "DELETE" });
+      const res = await fetchWithAuth(`${API_BASE}/outreach/leads/${id}`, { method: "DELETE" });
       const json = await res.json();
       if (json.success) {
         fetchLeads();
@@ -384,7 +445,7 @@ export function OutreachBoard() {
     if (!editingMessage) return;
 
     try {
-      const res = await fetch(`${API_BASE}/outreach/messages/${editingMessage.id}`, {
+      const res = await fetchWithAuth(`${API_BASE}/outreach/messages/${editingMessage.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -413,7 +474,7 @@ export function OutreachBoard() {
   const handleSendSingleEmail = async (id: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/outreach/send/${id}`, { method: "POST" });
+      const res = await fetchWithAuth(`${API_BASE}/outreach/send/${id}`, { method: "POST" });
       const json = await res.json();
       alert(json.message || "Email send triggered!");
       setEditingMessage(null);
@@ -1264,6 +1325,129 @@ export function OutreachBoard() {
           </div>
         </div>
       )}
+
+      {/* 6. SECURITY AUTHENTICATION PASSCODE MODAL */}
+      {showAuthModal && (
+        <div 
+          className="glass-modal-overlay" 
+          style={{ 
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: "rgba(15, 23, 42, 0.4)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+        >
+          <div 
+            className="glass-modal-content" 
+            style={{ 
+              width: "420px", 
+              background: "rgba(255, 255, 255, 0.95)",
+              border: "1px solid rgba(229, 231, 235, 0.5)",
+              borderRadius: "20px",
+              boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
+              padding: "2rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1.5rem",
+            }}
+          >
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "2.5rem", marginBottom: "0.5rem" }}>🔒</div>
+              <h3 style={{ fontSize: "1.35rem", fontWeight: 700, color: "#1e293b", margin: 0 }}>Security Verification</h3>
+              <p style={{ fontSize: "0.88rem", color: "#64748b", marginTop: "0.5rem", lineHeight: 1.4 }}>
+                A secure passcode is required to send emails and manage outreach campaigns from your account.
+              </p>
+            </div>
+
+            <form onSubmit={handleAuthSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "#475569", marginBottom: "6px" }}>
+                  Enter Security Passcode
+                </label>
+                <div style={{ display: "flex", position: "relative" }}>
+                  <input
+                    type={showPasscodeText ? "text" : "password"}
+                    placeholder="••••••••••••"
+                    value={passcodeInput}
+                    onChange={(e) => setPasscodeInput(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "0.7rem 2.5rem 0.7rem 0.9rem",
+                      borderRadius: "10px",
+                      border: "1px solid #cbd5e1",
+                      fontSize: "0.95rem",
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasscodeText(!showPasscodeText)}
+                    style={{
+                      position: "absolute",
+                      right: "10px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "1.1rem",
+                      color: "#64748b",
+                      padding: "4px",
+                    }}
+                    title={showPasscodeText ? "Hide passcode" : "Show passcode"}
+                  >
+                    {showPasscodeText ? "👁️" : "👁️‍🗨️"}
+                  </button>
+                </div>
+              </div>
+
+              {authError && (
+                <div 
+                  style={{ 
+                    color: "#ef4444", 
+                    fontSize: "0.8rem", 
+                    fontWeight: 500,
+                    background: "#fef2f2",
+                    padding: "0.5rem 0.75rem",
+                    borderRadius: "8px",
+                    border: "1px solid #fee2e2",
+                    lineHeight: 1.3,
+                  }}
+                >
+                  ⚠️ {authError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  background: "linear-gradient(to right, #4f46e5, #6366f1)",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "10px",
+                  fontSize: "0.95rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  boxShadow: "0 4px 6px -1px rgb(79 70 229 / 0.1)",
+                }}
+              >
+                Authenticate Session
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
