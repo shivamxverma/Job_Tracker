@@ -4,7 +4,6 @@ import { useMemo, useState, useEffect } from "react";
 
 import { JobCard, getStatusStyle } from "@/components/job-card";
 import type { Job } from "@/types/job";
-import { OutreachBoard } from "@/components/outreach-board";
 import { GmailOutreach } from "@/components/gmail-outreach";
 import { ColdMailerBoard } from "@/components/cold-mailer-board";
 import { LinkedinOutreach } from "@/components/linkedin-outreach";

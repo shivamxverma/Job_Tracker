@@ -177,7 +177,7 @@ export function GmailOutreach() {
     if (!bulkText.trim()) return;
 
     setActionLoading("bulk-add");
-    let parsedLeads: any[] = [];
+    let parsedLeads: { companyName: string; recipientEmail: string; jobDescription: string }[] = [];
     const text = bulkText.trim();
 
     try {
@@ -192,7 +192,7 @@ export function GmailOutreach() {
           }));
         }
       }
-    } catch (e) {}
+    } catch {}
 
     // Try CSV format
     if (parsedLeads.length === 0) {
@@ -414,7 +414,7 @@ export function GmailOutreach() {
         } else {
           failed++;
         }
-      } catch (err) {
+      } catch {
         failed++;
       }
     }

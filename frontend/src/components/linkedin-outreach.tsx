@@ -197,6 +197,7 @@ export function LinkedinOutreach() {
   useEffect(() => {
     checkLinkedinAuthStatus();
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Add a Recruiter target profile
@@ -396,7 +397,7 @@ export function LinkedinOutreach() {
         if (updatedJson.success) {
           setResumes(updatedJson.data);
           // Set selection to the uploaded resume
-          const uploadedResume = updatedJson.data.find((r: any) => r.title === file.name.replace(".pdf", ""));
+          const uploadedResume = updatedJson.data.find((r: Resume) => r.title === file.name.replace(".pdf", ""));
           if (uploadedResume) {
             setSelectedResumeId(uploadedResume.id);
           } else if (updatedJson.data.length > 0) {
@@ -1119,7 +1120,7 @@ export function LinkedinOutreach() {
                           {linkedInMsg ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
                               <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--text)", fontStyle: "italic", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "160px" }}>
-                                "{linkedInMsg.content}"
+                               &quot;{linkedInMsg.content}&quot;
                               </p>
                               <span style={{ fontSize: "0.7rem", color: "var(--muted)" }}>
                                 {linkedInMsg.content.length} chars / 300 max
