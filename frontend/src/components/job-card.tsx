@@ -1,4 +1,5 @@
 import type { Job } from "@/types/job";
+import { MapPin, DollarSign, ExternalLink, Zap, Target } from "lucide-react";
 
 type JobCardProps = {
   job: Job;
@@ -34,28 +35,19 @@ function formatPostedDate(value: string) {
 export function JobCard({ job, onTrack, onSelect }: JobCardProps) {
   return (
     <article 
-      className="job-card"
+      className="rounded-xl border bg-card text-card-foreground shadow-sm p-5 hover:shadow-md transition-shadow relative flex flex-col justify-between"
       onClick={() => onSelect?.(job)}
       style={{ cursor: "pointer", transition: "transform 150ms ease, box-shadow 150ms ease" }}
     >
-      <div className="job-card__eyebrow">
-        <span className="source-label">{job.source}</span>
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+      <div className="flex justify-between items-center mb-4">
+        <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase text-muted-foreground">{job.source}</span>
+        <div className="flex gap-2 items-center text-xs text-muted-foreground">
           {job.status && (
             <span
-              className="status-badge"
+              className="inline-flex items-center px-2 py-0.5 rounded-full font-semibold shadow-sm text-[0.68rem]"
               style={{
                 background: getStatusStyle(job.status).bg,
                 color: getStatusStyle(job.status).text,
-                padding: "0.15rem 0.55rem",
-                borderRadius: "999px",
-                fontWeight: 600,
-                fontSize: "0.68rem",
-                textTransform: "none",
-                letterSpacing: "normal",
-                boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                display: "inline-flex",
-                alignItems: "center"
               }}
             >
               {getStatusStyle(job.status).label}
@@ -65,26 +57,25 @@ export function JobCard({ job, onTrack, onSelect }: JobCardProps) {
         </div>
       </div>
 
-      <div className="job-card__content">
-        <div>
-          <h2>{job.title}</h2>
-          <p className="job-card__company">{job.company}</p>
-        </div>
-
-        <div className="job-card__meta">
-          <span>{job.location}</span>
-          <span>{job.salary ?? "Salary not listed"}</span>
-        </div>
+      <div className="flex flex-col gap-1 mb-4">
+        <h2 className="text-lg font-bold leading-tight">{job.title}</h2>
+        <p className="text-sm font-medium text-muted-foreground">{job.company}</p>
       </div>
 
-      <div className="job-card__footer" onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+      <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-muted-foreground mb-6">
+        <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> {job.location}</span>
+        <span className="flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5" /> {job.salary ?? "Salary not listed"}</span>
+      </div>
+
+      <div className="flex items-center justify-between border-t pt-4 mt-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex gap-2 items-center flex-wrap">
           {job.applyUrl ? (
-            <a href={job.applyUrl} target="_blank" rel="noreferrer">
+            <a href={job.applyUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-sm text-primary hover:underline gap-1 font-medium">
+              <ExternalLink className="w-3.5 h-3.5" />
               Apply now
             </a>
           ) : (
-            <span className="no-apply-link">No link</span>
+            <span className="text-sm text-muted-foreground">No link</span>
           )}
 
           <button
@@ -92,26 +83,9 @@ export function JobCard({ job, onTrack, onSelect }: JobCardProps) {
               e.stopPropagation();
               onSelect?.(job);
             }}
-            className="auto-apply-button"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              minHeight: "42px",
-              padding: "0.65rem 1.15rem",
-              borderRadius: "999px",
-              background: "linear-gradient(90deg, #6366f1 0%, #a855f7 100%)",
-              color: "white",
-              fontSize: "0.92rem",
-              fontWeight: 600,
-              border: "none",
-              cursor: "pointer",
-              transition: "all 180ms ease, transform 100ms ease",
-              fontFamily: "inherit",
-              boxShadow: "0 2px 8px rgba(99, 102, 241, 0.25)",
-            }}
+            className="inline-flex items-center justify-center min-h-[36px] px-3 py-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-medium border-none cursor-pointer transition-transform hover:scale-[1.02] shadow-sm ml-2 gap-1.5"
           >
-            ⚡ Auto Apply
+            <Zap className="w-3.5 h-3.5 fill-current" /> Auto Apply
           </button>
         </div>
 
@@ -120,25 +94,10 @@ export function JobCard({ job, onTrack, onSelect }: JobCardProps) {
             e.stopPropagation();
             onTrack?.(job);
           }}
-          className="track-button"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            minHeight: "42px",
-            padding: "0.65rem 1.15rem",
-            borderRadius: "999px",
-            background: job.status ? "rgba(49, 37, 24, 0.05)" : "transparent",
-            color: "var(--text)",
-            fontSize: "0.92rem",
-            fontWeight: 500,
-            border: "1px solid var(--border)",
-            cursor: "pointer",
-            transition: "all 180ms ease",
-            fontFamily: "inherit",
-          }}
+          className="inline-flex items-center justify-center min-h-[36px] px-3 py-1.5 rounded-full text-sm font-medium border cursor-pointer transition-colors bg-transparent text-foreground hover:bg-muted gap-1.5"
         >
-          {job.status ? "Update Status" : "Track"}
+          <Target className="w-3.5 h-3.5" />
+          {job.status ? "Update" : "Track"}
         </button>
       </div>
     </article>

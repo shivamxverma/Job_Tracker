@@ -1,16 +1,25 @@
-import { JobsBoard } from "@/components/jobs-board";
-import { listJobs } from "@/lib/jobs-service";
+const fs = require('fs');
 
-export const dynamic = "force-dynamic";
+const paths = [
+  'src/app/page.tsx',
+  'src/app/tracker/page.tsx',
+  'src/app/queue/page.tsx',
+  'src/app/gmail/page.tsx',
+  'src/app/linkedin/page.tsx',
+  'src/app/outreach/page.tsx'
+];
 
-export default async function HomePage() {
-  const jobs = await listJobs();
-  const fetchedAt = new Date().toISOString();
-  const sourceCount = new Set(jobs.map((job) => job.source)).size;
-
-  return (
-    <main className="container mx-auto px-4 py-8 md:px-8 flex flex-col gap-8">
-      <header className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+for (const p of paths) {
+  if (fs.existsSync(p)) {
+    let content = fs.readFileSync(p, 'utf-8');
+    
+    // Replace page-shell
+    content = content.replace(/className="page-shell"/g, 'className="container mx-auto px-4 py-8 md:px-8 flex flex-col gap-8"');
+    
+    if (p === 'src/app/page.tsx') {
+      content = content.replace(
+        /<header className="page-header">[\s\S]*?<\/header>/,
+        `<header className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <p className="text-primary font-semibold text-sm uppercase tracking-wider">Live job listings</p>
           <h1 className="text-3xl font-bold mt-1 tracking-tight">Job board</h1>
@@ -27,9 +36,11 @@ export default async function HomePage() {
             <span className="text-sm text-muted-foreground uppercase font-medium tracking-wider">sources</span>
           </span>
         </div>
-      </header>
-
-      <JobsBoard jobs={jobs} />
-    </main>
-  );
+      </header>`
+      );
+    }
+    
+    fs.writeFileSync(p, content);
+  }
 }
+console.log("Pages fixed");

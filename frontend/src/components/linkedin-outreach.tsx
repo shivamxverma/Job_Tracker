@@ -1,5 +1,6 @@
 "use client";
 
+import { Linkedin, Send } from "lucide-react";
 import React, { useState, useEffect } from "react";
 
 interface OutboundMessage {
@@ -91,7 +92,7 @@ export function LinkedinOutreach() {
     try {
       setCheckingAuth(true);
       const res = await fetch(`${API_BASE}/outreach/linkedin/status`, {
-        headers: { "bypass-tunnel-reminder": "true" },
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "bypass-tunnel-reminder": "true" },
       });
       const json = await res.json();
       setLinkedinAuth({ authenticated: !!json.authenticated });
@@ -109,7 +110,7 @@ export function LinkedinOutreach() {
       setConnectingStatusText("Launching headed Chrome browser on your desktop...");
       
       const res = await fetch(`${API_BASE}/outreach/linkedin/connect`, {
-        headers: { "bypass-tunnel-reminder": "true" },
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "bypass-tunnel-reminder": "true" },
       });
       
       if (!res.ok) {
@@ -132,9 +133,9 @@ export function LinkedinOutreach() {
     try {
       setLoading(true);
       const [resResumes, resTemplates, resProfiles] = await Promise.all([
-        fetch(`${API_BASE}/outreach-flow/resumes`, { headers: { "bypass-tunnel-reminder": "true" } }),
-        fetch(`${API_BASE}/outreach-flow/templates`, { headers: { "bypass-tunnel-reminder": "true" } }),
-        fetch(`${API_BASE}/outreach-flow/profiles`, { headers: { "bypass-tunnel-reminder": "true" } }),
+        fetch(`${API_BASE}/outreach-flow/resumes`, { headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "bypass-tunnel-reminder": "true" } }),
+        fetch(`${API_BASE}/outreach-flow/templates`, { headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "bypass-tunnel-reminder": "true" } }),
+        fetch(`${API_BASE}/outreach-flow/profiles`, { headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "bypass-tunnel-reminder": "true" } }),
       ]);
 
       const jsonResumes = await resResumes.json();
@@ -167,7 +168,7 @@ export function LinkedinOutreach() {
       interval = setInterval(async () => {
         try {
           const res = await fetch(`${API_BASE}/outreach-flow/profiles`, {
-            headers: { "bypass-tunnel-reminder": "true" },
+            headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "bypass-tunnel-reminder": "true" },
           });
           const json = await res.json();
           if (json.success) {
@@ -209,7 +210,7 @@ export function LinkedinOutreach() {
     try {
       const res = await fetch(`${API_BASE}/outreach-flow/profiles`, {
         method: "POST",
-        headers: {
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b",
           "Content-Type": "application/json",
           "bypass-tunnel-reminder": "true",
         },
@@ -270,7 +271,7 @@ export function LinkedinOutreach() {
       
       const res = await fetch(`${API_BASE}/outreach/linkedin/extract-file`, {
         method: "POST",
-        headers: {
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b",
           "Content-Type": "application/json",
           "bypass-tunnel-reminder": "true",
         },
@@ -330,7 +331,7 @@ export function LinkedinOutreach() {
 
       const res = await fetch(`${API_BASE}/outreach/linkedin/import-cookies`, {
         method: "POST",
-        headers: {
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b",
           "Content-Type": "application/json",
           "bypass-tunnel-reminder": "true",
         },
@@ -376,7 +377,7 @@ export function LinkedinOutreach() {
       const base64Str = await convertBase64(file);
       const res = await fetch(`${API_BASE}/outreach-flow/resumes`, {
         method: "POST",
-        headers: {
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b",
           "Content-Type": "application/json",
           "bypass-tunnel-reminder": "true"
         },
@@ -391,7 +392,7 @@ export function LinkedinOutreach() {
         alert("Master resume uploaded and parsed successfully!");
         // Refresh resumes list and select the uploaded one
         const updatedRes = await fetch(`${API_BASE}/outreach-flow/resumes`, {
-          headers: { "bypass-tunnel-reminder": "true" }
+          headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "bypass-tunnel-reminder": "true" }
         });
         const updatedJson = await updatedRes.json();
         if (updatedJson.success) {
@@ -427,7 +428,7 @@ export function LinkedinOutreach() {
     try {
       const res = await fetch(`${API_BASE}/outreach/linkedin/generate`, {
         method: "POST",
-        headers: {
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b",
           "Content-Type": "application/json",
           "bypass-tunnel-reminder": "true",
         },
@@ -457,7 +458,7 @@ export function LinkedinOutreach() {
     try {
       const res = await fetch(`${API_BASE}/outreach-flow/profiles/${id}`, {
         method: "DELETE",
-        headers: { "bypass-tunnel-reminder": "true" },
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "bypass-tunnel-reminder": "true" },
       });
       const json = await res.json();
       if (json.success) {
@@ -482,7 +483,7 @@ export function LinkedinOutreach() {
       // Use existing patch endpoint: /outreach-flow/approval/:id
       const res = await fetch(`${API_BASE}/outreach-flow/approval/${editingMessage.id}`, {
         method: "PATCH",
-        headers: {
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b",
           "Content-Type": "application/json",
           "bypass-tunnel-reminder": "true",
         },
@@ -789,8 +790,7 @@ export function LinkedinOutreach() {
             <form onSubmit={handleAddProfile} style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                 <label style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 600 }}>Recruiter Name</label>
-                <input
-                  type="text"
+                <input type="text" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   placeholder="Jane Doe"
                   value={newProfileName}
                   onChange={(e) => setNewProfileName(e.target.value)}
@@ -810,8 +810,7 @@ export function LinkedinOutreach() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                   <label style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 600 }}>Role Title</label>
-                  <input
-                    type="text"
+                  <input type="text" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="Technical Recruiter"
                     value={newProfileRole}
                     onChange={(e) => setNewProfileRole(e.target.value)}
@@ -829,8 +828,7 @@ export function LinkedinOutreach() {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                   <label style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 600 }}>Company</label>
-                  <input
-                    type="text"
+                  <input type="text" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="Google"
                     value={newProfileCompany}
                     onChange={(e) => setNewProfileCompany(e.target.value)}
@@ -850,8 +848,7 @@ export function LinkedinOutreach() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                 <label style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 600 }}>LinkedIn Profile URL</label>
-                <input
-                  type="url"
+                <input type="url" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   placeholder="https://www.linkedin.com/in/recruiter-username"
                   value={newProfileLinkedinUrl}
                   onChange={(e) => setNewProfileLinkedinUrl(e.target.value)}
@@ -869,7 +866,7 @@ export function LinkedinOutreach() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                 <label style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 600 }}>Notes / Outreach Context</label>
-                <textarea
+                <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   rows={3}
                   placeholder="E.g., recruiting for the Platform Engineering role or met at tech conference..."
                   value={newProfileNotes}
@@ -928,7 +925,7 @@ export function LinkedinOutreach() {
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                 <label style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 600 }}>Master Latex Resume</label>
                 <div style={{ display: "flex", gap: "0.5rem" }}>
-                  <select
+                  <select className="flex h-10 items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     value={selectedResumeId}
                     onChange={(e) => setSelectedResumeId(e.target.value)}
                     style={{
@@ -980,7 +977,7 @@ export function LinkedinOutreach() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                 <label style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 600 }}>Target Prompt Template</label>
-                <select
+                <select className="flex h-10 items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   value={selectedTemplateId}
                   onChange={(e) => setSelectedTemplateId(e.target.value)}
                   style={{
@@ -1342,7 +1339,7 @@ export function LinkedinOutreach() {
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                 <label style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 600 }}>Message Content</label>
-                <textarea
+                <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   rows={6}
                   value={editedContent}
                   onChange={(e) => setEditedContent(e.target.value)}

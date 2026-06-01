@@ -7,7 +7,6 @@ import { applyWorker } from "./queues/apply.worker.js";
 import { outreachWorker } from "./queues/outreach.worker.js";
 import { outreachRouter } from "./routes/outreach.routes.js";
 import { outreachFlowRouter } from "./routes/outreach-flow.routes.js";
-import { coldMailRouter } from "./routes/cold-mail.routes.js";
 import { linkedinOutreachRouter } from "./routes/linkedin-outreach.routes.js";
 import { requireAuth } from "./routes/auth.middleware.js";
 
@@ -37,7 +36,6 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(outreachRouter);
 app.use(outreachFlowRouter);
-app.use(coldMailRouter);
 app.use(linkedinOutreachRouter);
 
 

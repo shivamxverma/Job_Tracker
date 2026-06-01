@@ -5,8 +5,10 @@ import { useMemo, useState, useEffect } from "react";
 import { JobCard, getStatusStyle } from "@/components/job-card";
 import type { Job } from "@/types/job";
 import { GmailOutreach } from "@/components/gmail-outreach";
-import { ColdMailerBoard } from "@/components/cold-mailer-board";
 import { LinkedinOutreach } from "@/components/linkedin-outreach";
+import { Button } from "@/components/ui/button";
+import { Plus, ExternalLink, ChevronDown, Pencil, Wand2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 interface ResumeVersion {
   id: string;
@@ -26,14 +28,15 @@ interface Application {
 
 type JobsBoardProps = {
   jobs: Job[];
+  defaultTab?: "explore" | "tracker" | "queue";
 };
 
-export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
+export function JobsBoard({ jobs: initialJobs, defaultTab = "explore" }: JobsBoardProps) {
   // Main reactive database state
   const [allJobs, setAllJobs] = useState<Job[]>(initialJobs);
 
-  // Layout Tab State: "explore", "tracker", "queue", "outreach", "coldmailer", or "linkedin"
-  const [activeTab, setActiveTab] = useState<"explore" | "tracker" | "queue" | "outreach" | "coldmailer" | "linkedin">("explore");
+  // Layout Tab State
+  const [activeTab, setActiveTab] = useState<"explore" | "tracker" | "queue">(defaultTab);
 
   // Search & Filter state for Explore
   const [query, setQuery] = useState("");
@@ -377,88 +380,19 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
   };
 
   return (
-    <div className="jobs-board-wrapper">
-      {/* Dynamic Navigation Tabs */}
-      <nav className="board-tabs" aria-label="Job Board Navigation">
-        <button
-          className={`board-tab-btn ${activeTab === "explore" ? "active" : ""}`}
-          onClick={() => setActiveTab("explore")}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="7" height="9" rx="1" />
-            <rect x="14" y="3" width="7" height="5" rx="1" />
-            <rect x="14" y="12" width="7" height="9" rx="1" />
-            <rect x="3" y="16" width="7" height="5" rx="1" />
-          </svg>
-          Explore Board
-        </button>
-        <button
-          className={`board-tab-btn ${activeTab === "queue" ? "active" : ""}`}
-          onClick={() => {
-            setActiveTab("queue");
-            fetchApplications();
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-          </svg>
-          Auto-Apply Queue
-        </button>
-        <button
-          className={`board-tab-btn ${activeTab === "tracker" ? "active" : ""}`}
-          onClick={() => setActiveTab("tracker")}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M9 11l3 3L22 4" />
-            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-          </svg>
-          Application Tracker
-        </button>
-        <button
-          className={`board-tab-btn ${activeTab === "outreach" ? "active" : ""}`}
-          onClick={() => setActiveTab("outreach")}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M22 2L11 13" />
-            <polygon points="22 2 15 22 11 13 2 9 22 2" />
-          </svg>
-          Gmail Outreach
-        </button>
-        <button
-          className={`board-tab-btn ${activeTab === "coldmailer" ? "active" : ""}`}
-          onClick={() => setActiveTab("coldmailer")}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M22 2L11 13" />
-            <polygon points="22 2 15 22 11 13 2 9 22 2" />
-          </svg>
-          Cold Mailer
-        </button>
-        <button
-          className={`board-tab-btn ${activeTab === "linkedin" ? "active" : ""}`}
-          onClick={() => setActiveTab("linkedin")}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
-            <rect x="2" y="9" width="4" height="12" />
-            <circle cx="4" cy="4" r="2" />
-          </svg>
-          LinkedIn Outreach
-        </button>
-      </nav>
-
+    <div className="w-full flex flex-col gap-6">
       {/* ==================== EXPLORE BOARD TAB ==================== */}
       {activeTab === "explore" && (
-        <section className="jobs-section">
-          <div className="jobs-section__header">
+        <section className="flex flex-col gap-6">
+          <div className="bg-card text-card-foreground border rounded-xl shadow-sm p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <p className="section-kicker">All listings</p>
-              <h2>Fresh scraped roles</h2>
+              <p className="text-primary font-semibold text-sm uppercase tracking-wider">All listings</p>
+              <h2 className="text-2xl font-bold mt-1">Fresh scraped roles</h2>
             </div>
 
-            <div className="jobs-toolbar">
-              <div className="jobs-toolbar-controls">
-                <label className="checkbox-filter" htmlFor="entry-level-toggle">
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 text-sm font-medium cursor-pointer" htmlFor="entry-level-toggle">
                   <input
                     id="entry-level-toggle"
                     type="checkbox"
@@ -485,12 +419,12 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
           </div>
 
           {filteredJobs.length === 0 ? (
-            <div className="empty-state">
-              <h3>No matching jobs</h3>
+            <div className="flex flex-col items-center justify-center p-8 text-center border-2 border-dashed rounded-xl bg-card text-muted-foreground my-8">
+              <h3 className="text-lg font-semibold leading-none tracking-tight">No matching jobs</h3>
               <p>Try a different keyword or clear the search to see every role in the database.</p>
             </div>
           ) : (
-            <div className="jobs-grid">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredJobs.map((job) => (
                 <JobCard
                   key={job.id}
@@ -514,63 +448,61 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
 
       {/* ==================== APPLICATION TRACKER TAB ==================== */}
       {activeTab === "tracker" && (
-        <section className="tracker-section">
+        <section className="flex flex-col gap-6">
           {/* Metrics Dashboard */}
-          <div className="tracker-metrics-grid">
-            <div className="metric-card metric-total">
-              <div className="metric-card-inner">
-                <span className="metric-label">Applications</span>
-                <span className="metric-val">{metrics.total}</span>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-5 relative overflow-hidden">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-muted-foreground">Applications</span>
+                <span className="text-3xl font-bold">{metrics.total}</span>
               </div>
-              <div className="metric-card-accent" />
+              <div className="absolute inset-x-0 bottom-0 h-1 bg-primary/20" />
             </div>
 
-            <div className="metric-card metric-interviewing">
-              <div className="metric-card-inner">
-                <span className="metric-label">Interviewing</span>
-                <span className="metric-val text-blue">{metrics.interviewing}</span>
+            <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-5 relative overflow-hidden">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-muted-foreground">Interviewing</span>
+                <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">{metrics.interviewing}</span>
               </div>
-              <div className="metric-card-accent" />
+              <div className="absolute inset-x-0 bottom-0 h-1 bg-primary/20" />
             </div>
 
-            <div className="metric-card metric-offers">
-              <div className="metric-card-inner">
-                <span className="metric-label">Offers Received</span>
-                <span className="metric-val text-green">{metrics.offers}</span>
+            <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-5 relative overflow-hidden">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-muted-foreground">Offers Received</span>
+                <span className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{metrics.offers}</span>
               </div>
-              <div className="metric-card-accent" />
+              <div className="absolute inset-x-0 bottom-0 h-1 bg-primary/20" />
             </div>
 
-            <div className="metric-card metric-rejected">
-              <div className="metric-card-inner">
-                <span className="metric-label">Rejections</span>
-                <span className="metric-val text-red">{metrics.rejected}</span>
+            <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-5 relative overflow-hidden">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-muted-foreground">Rejections</span>
+                <span className="text-3xl font-bold text-red-600 dark:text-red-400">{metrics.rejected}</span>
               </div>
-              <div className="metric-card-accent" />
+              <div className="absolute inset-x-0 bottom-0 h-1 bg-primary/20" />
             </div>
           </div>
 
           {/* Tracker Toolbar */}
-          <div className="tracker-toolbar-container">
-            <div className="tracker-toolbar-left">
-              <h2>My Applications</h2>
-              <p className="tracker-toolbar-sub">{trackedJobs.length} active pipelines</p>
+          <div className="bg-card text-card-foreground border rounded-xl shadow-sm p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex flex-col">
+              <h2 className="text-xl font-bold">My Applications</h2>
+              <p className="text-sm text-muted-foreground">{trackedJobs.length} active pipelines</p>
             </div>
 
-            <div className="tracker-toolbar-right">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
               {/* Search */}
-              <div className="tracker-search-box">
-                <input
-                  type="text"
-                  placeholder="Filter by company, role..."
+              <div className="w-full sm:w-auto">
+                <input type="text" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" placeholder="Filter by company, role..."
                   value={trackerQuery}
                   onChange={(e) => setTrackerQuery(e.target.value)}
                 />
               </div>
 
               {/* Status Filter */}
-              <div className="tracker-status-filter">
-                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <div className="w-full sm:w-auto">
+                <select className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                   <option value="all">All Statuses</option>
                   <option value="Applied">Applied</option>
                   <option value="Followed Up">Followed Up</option>
@@ -581,11 +513,8 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
               </div>
 
               {/* Add Manual Application Button */}
-              <button className="add-app-btn" onClick={() => setShowManualModal(true)}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
+              <button className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full sm:w-auto whitespace-nowrap" onClick={() => setShowManualModal(true)}>
+                <Plus className="w-4 h-4 mr-2" />
                 Track Application
               </button>
             </div>
@@ -593,21 +522,21 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
 
           {/* Applications list */}
           {trackedJobs.length === 0 ? (
-            <div className="empty-state">
-              <h3>No tracked applications yet</h3>
+            <div className="flex flex-col items-center justify-center p-8 text-center border-2 border-dashed rounded-xl bg-card text-muted-foreground my-8">
+              <h3 className="text-lg font-semibold leading-none tracking-tight">No tracked applications yet</h3>
               <p>Go to the &quot;Explore Board&quot; to track a scraped job, or click &quot;Track Application&quot; to add a manual entry!</p>
             </div>
           ) : (
-            <div className="tracker-table-container">
-              <table className="tracker-table">
+            <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden overflow-x-auto">
+              <table className="w-full caption-bottom text-sm">
                 <thead>
                   <tr>
-                    <th>Company</th>
-                    <th>Role</th>
-                    <th>Platform</th>
-                    <th>Status</th>
-                    <th>Date Applied</th>
-                    <th>Notes & Details</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Company</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Role</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Platform</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Date Applied</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Notes & Details</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -616,11 +545,11 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                     const isDropdownActive = activeInlineDropdownId === job.id;
 
                     return (
-                      <tr key={job.id} className="tracker-row">
-                        <td className="company-col">
+                      <tr key={job.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                        <td className="p-4 align-middle">
                           <strong>{job.company}</strong>
                         </td>
-                        <td className="role-col">
+                        <td className="p-4 align-middle flex items-center gap-2">
                           <span>{job.title}</span>
                           {job.applyUrl && (
                             <a
@@ -630,24 +559,20 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                               className="inline-url-icon"
                               title="Go to posting"
                             >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                <polyline points="15 3 21 3 21 9" />
-                                <line x1="10" y1="14" x2="21" y2="3" />
-                              </svg>
+                              <ExternalLink className="w-3.5 h-3.5" />
                             </a>
                           )}
                         </td>
-                        <td className="platform-col">
+                        <td className="p-4 align-middle">
                           <span className={`platform-pill ${getPlatformTagClass(job.platform || job.source || "")}`}>
                             {job.platform || job.source}
                           </span>
                         </td>
-                        <td className="status-col">
+                        <td className="p-4 align-middle">
                           {/* Premium interactive status dropdown */}
-                          <div className="status-select-container">
+                          <div className="relative">
                             <button
-                              className="status-dropdown-trigger"
+                              className="inline-flex items-center px-2 py-0.5 rounded-full font-semibold shadow-sm text-[0.68rem] transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                               style={{
                                 background: statusColor.bg,
                                 color: statusColor.text,
@@ -657,47 +582,40 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                               }
                             >
                               {statusColor.label}
-                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="6 9 12 15 18 9" />
-                              </svg>
+                              <ChevronDown className="w-3.5 h-3.5 ml-1" />
                             </button>
 
                             {isDropdownActive && (
-                              <div className="status-floating-menu">
-                                <button
-                                  onClick={() => {
+                              <div className="absolute z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md top-full mt-1 left-0 flex flex-col p-1 animate-in fade-in-0 zoom-in-95">
+                                <button className="relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50" onClick={() => {
                                     handleUpdateStatus(job.id, "Applied", job.platform || job.source, job.notes || "");
                                     setActiveInlineDropdownId(null);
                                   }}
                                 >
                                   Applied
                                 </button>
-                                <button
-                                  onClick={() => {
+                                <button className="relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50" onClick={() => {
                                     handleUpdateStatus(job.id, "Followed Up", job.platform || job.source, job.notes || "");
                                     setActiveInlineDropdownId(null);
                                   }}
                                 >
                                   Followed Up
                                 </button>
-                                <button
-                                  onClick={() => {
+                                <button className="relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50" onClick={() => {
                                     handleUpdateStatus(job.id, "Interview Scheduled", job.platform || job.source, job.notes || "");
                                     setActiveInlineDropdownId(null);
                                   }}
                                 >
                                   Interview Scheduled
                                 </button>
-                                <button
-                                  onClick={() => {
+                                <button className="relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50" onClick={() => {
                                     handleUpdateStatus(job.id, "Offer", job.platform || job.source, job.notes || "");
                                     setActiveInlineDropdownId(null);
                                   }}
                                 >
                                   Offer
                                 </button>
-                                <button
-                                  onClick={() => {
+                                <button className="relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50" onClick={() => {
                                     handleUpdateStatus(job.id, "Rejected", job.platform || job.source, job.notes || "");
                                     setActiveInlineDropdownId(null);
                                   }}
@@ -725,24 +643,20 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                               )
                             : "-"}
                         </td>
-                        <td className="notes-col">
-                          <div className="notes-display">
+                        <td className="p-4 align-middle">
+                          <div className="flex items-center justify-between gap-2 max-w-[200px]">
                             {job.notes ? (
-                              <span className="notes-text" title={job.notes}>
+                              <span className="truncate text-sm text-muted-foreground" title={job.notes}>
                                 {job.notes}
                               </span>
                             ) : (
-                              <span className="no-notes-placeholder">No notes added</span>
+                              <span className="text-sm text-muted-foreground/50 italic">No notes added</span>
                             )}
-                            <button
-                              className="edit-notes-icon-btn"
+                            <button className="shrink-0"
                               onClick={() => handleOpenTrackModal(job)}
                               title="Edit notes/platform"
                             >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M12 20h9" />
-                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                              </svg>
+                              <Pencil className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors cursor-pointer" />
                             </button>
                           </div>
                         </td>
@@ -758,17 +672,17 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
 
       {/* ==================== AUTO-APPLY LIVE QUEUE TAB ==================== */}
       {activeTab === "queue" && (
-        <section className="tracker-section" style={{ minHeight: "60vh" }}>
-          <div className="tracker-toolbar-container">
-            <div className="tracker-toolbar-left">
+        <section className="flex flex-col gap-6" style={{ minHeight: "60vh" }}>
+          <div className="bg-card text-card-foreground border rounded-xl shadow-sm p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex flex-col">
               <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#111827", margin: "0" }}>Auto-Apply Live Queue</h2>
-              <p className="tracker-toolbar-sub" style={{ margin: "4px 0 0" }}>
+              <p className="text-sm text-muted-foreground" style={{ margin: "4px 0 0" }}>
                 Tracks live tailoring (Gemini/OpenAI) and background browser execution (Playwright)
               </p>
             </div>
-            <div className="tracker-toolbar-right">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
               <button 
-                className="add-app-btn" 
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full sm:w-auto whitespace-nowrap" 
                 onClick={fetchApplications}
                 style={{
                   display: "inline-flex",
@@ -792,15 +706,15 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
           </div>
 
           {applications.length === 0 ? (
-            <div className="empty-state" style={{ padding: "4rem 2rem", textAlign: "center", backgroundColor: "#f9fafb", borderRadius: "16px", border: "1px dashed var(--border)", marginTop: "1.5rem" }}>
+            <div className="flex flex-col items-center justify-center p-8 text-center border-2 border-dashed rounded-xl bg-card text-muted-foreground my-8" style={{ padding: "4rem 2rem", textAlign: "center", backgroundColor: "#f9fafb", borderRadius: "16px", border: "1px dashed var(--border)", marginTop: "1.5rem" }}>
               <h3 style={{ fontSize: "1.2rem", fontWeight: 600, color: "#475569", marginBottom: "0.5rem" }}>No applications in queue yet</h3>
               <p style={{ fontSize: "0.9rem", color: "#6b7280" }}>
                 Go to the &quot;Explore Board&quot;, click on a scraped job card, and click &quot;Auto Apply Now&quot; to launch your first automated application!
               </p>
             </div>
           ) : (
-            <div className="tracker-table-container" style={{ marginTop: "1.5rem", border: "1px solid var(--border)", borderRadius: "12px", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-              <table className="tracker-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+            <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden overflow-x-auto" style={{ marginTop: "1.5rem", border: "1px solid var(--border)", borderRadius: "12px", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+              <table className="w-full caption-bottom text-sm" style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: "#f9fafb", borderBottom: "1px solid var(--border)", textAlign: "left" }}>
                     <th style={{ padding: "1rem 1.25rem", fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>Job & Company</th>
@@ -863,7 +777,7 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                     }
 
                     return (
-                      <tr key={app.id} className="tracker-row" style={{ borderBottom: "1px solid var(--border)", transition: "background 150ms ease" }}>
+                      <tr key={app.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted" style={{ borderBottom: "1px solid var(--border)", transition: "background 150ms ease" }}>
                         <td style={{ padding: "1rem 1.25rem" }}>
                           <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                             <strong style={{ fontSize: "0.95rem", color: "#111827" }}>{app.job.title}</strong>
@@ -975,32 +889,17 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
         </section>
       )}
 
-      {/* ==================== GMAIL COLD OUTREACH TAB ==================== */}
-      {activeTab === "outreach" && (
-        <GmailOutreach />
-      )}
-
-      {/* ==================== COLD MAILER TAB ==================== */}
-      {activeTab === "coldmailer" && (
-        <ColdMailerBoard />
-      )}
-
-      {/* ==================== LINKEDIN OUTREACH TAB ==================== */}
-      {activeTab === "linkedin" && (
-        <LinkedinOutreach />
-      )}
-
       {/* ==================== SCRAPED JOB TRACK MODAL ==================== */}
       {selectedJobForTrack && (
-        <div className="glass-modal-overlay" onClick={() => setSelectedJobForTrack(null)}>
-          <div className="glass-modal-content" onClick={(e) => e.stopPropagation()}>
-            <header className="glass-modal-header">
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 flex items-center justify-center" onClick={() => setSelectedJobForTrack(null)}>
+          <div className="fixed z-50 grid w-full max-w-lg scale-100 gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg" onClick={(e) => e.stopPropagation()}>
+            <header className="flex flex-col space-y-1.5 text-center sm:text-left mb-4">
               <div>
-                <p className="modal-kicker">Track application status</p>
-                <h3>{selectedJobForTrack.company}</h3>
-                <p className="modal-subtitle">{selectedJobForTrack.title}</p>
+                <p className="text-sm text-muted-foreground font-semibold uppercase tracking-wider">Track application status</p>
+                <h3 className="text-lg font-semibold leading-none tracking-tight">{selectedJobForTrack.company}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{selectedJobForTrack.title}</p>
               </div>
-              <button className="modal-close-btn" onClick={() => setSelectedJobForTrack(null)}>
+              <button className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground" onClick={() => setSelectedJobForTrack(null)}>
                 &times;
               </button>
             </header>
@@ -1010,9 +909,9 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                 e.preventDefault();
                 handleUpdateStatus(selectedJobForTrack.id, trackStatus, trackPlatform, trackNotes);
               }}
-              className="modal-form"
+              className="flex flex-col gap-4"
             >
-              <div className="form-group">
+              <div className="flex flex-col space-y-2">
                 <label htmlFor="modal-status">Application Status</label>
                 <select
                   id="modal-status"
@@ -1028,7 +927,7 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                 </select>
               </div>
 
-              <div className="form-group">
+              <div className="flex flex-col space-y-2">
                 <label htmlFor="modal-platform">Platform / Source</label>
                 <select
                   id="modal-platform"
@@ -1045,7 +944,7 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                 </select>
               </div>
 
-              <div className="form-group">
+              <div className="flex flex-col space-y-2">
                 <label htmlFor="modal-notes">Notes / Outreach log</label>
                 <textarea
                   id="modal-notes"
@@ -1056,15 +955,15 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                 />
               </div>
 
-              <div className="modal-actions">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 mt-4">
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
                   onClick={() => setSelectedJobForTrack(null)}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary" disabled={isSubmitting}>
+                <button type="submit" className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2" disabled={isSubmitting}>
                   {isSubmitting ? "Saving..." : "Save Settings"}
                 </button>
               </div>
@@ -1075,21 +974,21 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
 
       {/* ==================== ADD MANUAL APPLICATION MODAL ==================== */}
       {showManualModal && (
-        <div className="glass-modal-overlay" onClick={() => setShowManualModal(false)}>
-          <div className="glass-modal-content" onClick={(e) => e.stopPropagation()}>
-            <header className="glass-modal-header">
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 flex items-center justify-center" onClick={() => setShowManualModal(false)}>
+          <div className="fixed z-50 grid w-full max-w-lg scale-100 gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg" onClick={(e) => e.stopPropagation()}>
+            <header className="flex flex-col space-y-1.5 text-center sm:text-left mb-4">
               <div>
-                <p className="modal-kicker">New Entry</p>
-                <h3>Track Application</h3>
+                <p className="text-sm text-muted-foreground font-semibold uppercase tracking-wider">New Entry</p>
+                <h3 className="text-lg font-semibold leading-none tracking-tight">Track Application</h3>
               </div>
-              <button className="modal-close-btn" onClick={() => setShowManualModal(false)}>
+              <button className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground" onClick={() => setShowManualModal(false)}>
                 &times;
               </button>
             </header>
 
-            <form onSubmit={handleAddManualApplication} className="modal-form">
-              <div className="form-row">
-                <div className="form-group">
+            <form onSubmit={handleAddManualApplication} className="flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col space-y-2">
                   <label htmlFor="manual-company">Company *</label>
                   <input
                     type="text"
@@ -1101,7 +1000,7 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                   />
                 </div>
 
-                <div className="form-group">
+                <div className="flex flex-col space-y-2">
                   <label htmlFor="manual-title">Role Title *</label>
                   <input
                     type="text"
@@ -1114,8 +1013,8 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col space-y-2">
                   <label htmlFor="manual-loc">Location</label>
                   <input
                     type="text"
@@ -1126,7 +1025,7 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                   />
                 </div>
 
-                <div className="form-group">
+                <div className="flex flex-col space-y-2">
                   <label htmlFor="manual-sal">Salary Info</label>
                   <input
                     type="text"
@@ -1138,8 +1037,8 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col space-y-2">
                   <label htmlFor="manual-plat">Platform / Source</label>
                   <select
                     id="manual-plat"
@@ -1156,7 +1055,7 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                   </select>
                 </div>
 
-                <div className="form-group">
+                <div className="flex flex-col space-y-2">
                   <label htmlFor="manual-status">Current Status</label>
                   <select
                     id="manual-status"
@@ -1172,7 +1071,7 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                 </div>
               </div>
 
-              <div className="form-group">
+              <div className="flex flex-col space-y-2">
                 <label htmlFor="manual-url">Job Posting URL (Optional)</label>
                 <input
                   type="url"
@@ -1183,7 +1082,7 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                 />
               </div>
 
-              <div className="form-group">
+              <div className="flex flex-col space-y-2">
                 <label htmlFor="manual-notes">Outreach & Application Notes</label>
                 <textarea
                   id="manual-notes"
@@ -1194,15 +1093,15 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                 />
               </div>
 
-              <div className="modal-actions">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 mt-4">
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
                   onClick={() => setShowManualModal(false)}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary" disabled={isSubmitting}>
+                <button type="submit" className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2" disabled={isSubmitting}>
                   {isSubmitting ? "Tracking..." : "Save Application"}
                 </button>
               </div>
@@ -1264,8 +1163,7 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                 position: "relative",
               }}
             >
-              <button 
-                onClick={() => {
+              <button className="relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50" onClick={() => {
                   setSelectedJobDetails(null);
                   if (pollingIntervalId) {
                     clearInterval(pollingIntervalId);
@@ -1349,9 +1247,7 @@ export function JobsBoard({ jobs: initialJobs }: JobsBoardProps) {
                     <h3 style={{ fontSize: "1.2rem", fontWeight: 600, margin: "0", color: "#e0e7ff" }}>AI Auto Apply Pipeline</h3>
                     <p style={{ fontSize: "0.82rem", color: "#c7d2fe", margin: "4px 0 0" }}>Tailors resume + submits via Playwright</p>
                   </div>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" strokeWidth="2">
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                  </svg>
+                  <Wand2 className="w-7 h-7 text-indigo-300" />
                 </div>
 
                 {pollingStatus === "IDLE" && (

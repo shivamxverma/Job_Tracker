@@ -494,11 +494,43 @@ outreachFlowRouter.post("/outreach-flow/outbox/send", requireSendAuth, async (re
       },
     });
 
-    const activeList = messages.filter((m) => m.profile.email);
+    let activeList = messages.filter((m) => m.profile.email);
 
     if (activeList.length === 0) {
       res.status(200).json({ success: true, message: "No approved messages with email addresses found in outbox." });
       return;
+    }
+
+    // 1. Safe Daily Limit Check to protect domain reputation
+    const maxDailyEmails = process.env.MAX_DAILY_EMAILS ? parseInt(process.env.MAX_DAILY_EMAILS, 10) : 50;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const emailsSentToday = await prisma.outboundMessage.count({
+      where: {
+        status: "SENT",
+        sentAt: {
+          gte: startOfToday,
+        },
+      },
+    });
+
+    const allowedToday = Math.max(0, maxDailyEmails - emailsSentToday);
+
+    let infoMsg = "";
+    if (activeList.length > allowedToday) {
+      const skippedCount = activeList.length - allowedToday;
+      console.warn(`[OutreachFlow API] Daily sending cap of ${maxDailyEmails} reached! Truncating from ${activeList.length} to ${allowedToday} emails (skipping ${skippedCount} to protect reputation).`);
+      activeList = activeList.slice(0, allowedToday);
+      infoMsg = ` Daily limit reached. Truncating outbox send list to ${allowedToday} emails to protect reputation (skipped ${skippedCount}).`;
+      
+      if (allowedToday === 0) {
+        res.status(429).json({
+          success: false,
+          message: `Daily sending limit of ${maxDailyEmails} reached. No more emails can be sent today.`,
+        });
+        return;
+      }
     }
 
     console.log(`[OutreachFlow API] Outbox dispatch triggered for ${activeList.length} approved emails...`);
@@ -506,7 +538,7 @@ outreachFlowRouter.post("/outreach-flow/outbox/send", requireSendAuth, async (re
     // Immediate acknowledgment 202 to client, send emails sequentially in the background
     res.status(202).json({
       success: true,
-      message: `Sequentially sending ${activeList.length} approved emails. Logs will update in real-time.`,
+      message: `Sequentially sending ${activeList.length} approved emails with safe 1-3 min delays.${infoMsg}`,
     });
 
     // Run background sequential SMTP sender
@@ -549,9 +581,10 @@ outreachFlowRouter.post("/outreach-flow/outbox/send", requireSendAuth, async (re
           });
         }
 
-        // Sequential Rate Limit Buffer: 2-5 seconds
+        // Safe spacing delay (1 to 3 minutes) to protect domain and SMTP reputation
         if (i < activeList.length - 1) {
-          const delay = 2000 + Math.random() * 3000;
+          const delay = 60000 + Math.random() * 120000;
+          console.log(`[OutreachFlow API] Safe spacing active: pausing for ${(delay / 60000).toFixed(2)} minutes before the next email...`);
           await sleep(delay);
         }
       }

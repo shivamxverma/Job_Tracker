@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { Plus, Rocket, RefreshCw, Lock, BarChart, Users, FileText, Briefcase, PenTool, Sparkles, Send, CheckCircle2, Copy } from "lucide-react";
 
 interface MessageDraft {
   id: string;
@@ -348,7 +349,7 @@ export function OutreachBoard() {
         const base64 = reader.result as string;
         const res = await fetchWithAuth(`${API_BASE}/outreach-flow/resumes`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "Content-Type": "application/json" },
           body: JSON.stringify({
             title: resumeTitle,
             pdfBase64: base64,
@@ -405,7 +406,7 @@ export function OutreachBoard() {
 
         const res = await fetchWithAuth(`${API_BASE}/outreach-flow/profiles`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "Content-Type": "application/json" },
           body: JSON.stringify({ profiles: listToUpload }),
         });
 
@@ -434,7 +435,7 @@ export function OutreachBoard() {
       try {
         const res = await fetchWithAuth(`${API_BASE}/outreach-flow/profiles`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "Content-Type": "application/json" },
           body: JSON.stringify({
             profiles: {
               name: profileName,
@@ -480,7 +481,7 @@ export function OutreachBoard() {
     try {
       const res = await fetchWithAuth(`${API_BASE}/outreach-flow/jobs`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "Content-Type": "application/json" },
         body: JSON.stringify({
           title: jobTitleInput,
           company: jobCompanyInput,
@@ -517,7 +518,7 @@ export function OutreachBoard() {
     try {
       const res = await fetchWithAuth(`${API_BASE}/outreach-flow/templates`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "Content-Type": "application/json" },
         body: JSON.stringify({
           id: editingTemplateId || undefined,
           name: templateName,
@@ -562,7 +563,7 @@ export function OutreachBoard() {
     try {
       const res = await fetchWithAuth(`${API_BASE}/outreach-flow/generate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "Content-Type": "application/json" },
         body: JSON.stringify({
           profileIds: Array.from(selectedProfileIds),
           resumeId: activeResumeId,
@@ -600,7 +601,7 @@ export function OutreachBoard() {
     try {
       const res = await fetchWithAuth(`${API_BASE}/outreach-flow/approval/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "Content-Type": "application/json" },
         body: JSON.stringify({
           subject: editingSubject,
           content: editingContent,
@@ -883,7 +884,7 @@ export function OutreachBoard() {
       >
         <div>
           <h1 style={{ fontSize: "1.75rem", fontWeight: 800, color: "#1e293b", margin: 0, letterSpacing: "-0.03em", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span>🚀</span> OutreachFlow <span style={{ fontSize: "0.75rem", padding: "2px 8px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", color: "white", borderRadius: "999px", fontWeight: 600 }}>MVP</span>
+            <Rocket className="w-5 h-5 text-primary" /> <span className="font-bold text-lg">OutreachFlow</span> <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary">MVP</span>
           </h1>
           <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: "0.9rem" }}>Contextual, high-signal referral and networking outreach scale system</p>
         </div>
@@ -941,13 +942,13 @@ export function OutreachBoard() {
         }}
       >
         {[
-          { key: "analytics", label: "📊 Overview" },
-          { key: "profiles", label: "👥 Target Profiles" },
-          { key: "resumes", label: "📄 Resumes" },
-          { key: "jobs", label: "💼 Target Jobs" },
+          { key: "analytics", label: "Overview", icon: <BarChart className="w-4 h-4 mr-2" /> },
+          { key: "profiles", label: "Target Profiles", icon: <Users className="w-4 h-4 mr-2" /> },
+          { key: "resumes", label: "Resumes", icon: <FileText className="w-4 h-4 mr-2" /> },
+          { key: "jobs", label: "Target Jobs", icon: <Briefcase className="w-4 h-4 mr-2" /> },
           { key: "templates", label: "📝 Templates" },
-          { key: "generation", label: "✨ Gen Queue" },
-          { key: "outbox", label: "✉️ Outbox Outbox" }
+          { key: "generation", label: "Gen Queue", icon: <Sparkles className="w-4 h-4 mr-2" /> },
+          { key: "outbox", label: "Outbox", icon: <Send className="w-4 h-4 mr-2" /> }
         ].map((tab) => {
           const isActive = activeTab === tab.key;
           return (
@@ -969,7 +970,7 @@ export function OutreachBoard() {
                 whiteSpace: "nowrap"
               }}
             >
-              {tab.label}
+              {tab.icon}{tab.label}
               {tab.key === "generation" && genQueueJobs.filter(j => j.status === "PENDING" || j.status === "GENERATING").length > 0 && (
                 <span style={{ marginLeft: "6px", width: "8px", height: "8px", background: "#ef4444", borderRadius: "50%", display: "inline-block", animation: "pulseGlow 1s infinite" }} />
               )}
@@ -1047,28 +1048,28 @@ export function OutreachBoard() {
             </div>
 
             {/* Quickstart tutorial widget */}
-            <div style={{ background: "linear-gradient(135deg, #1e1b4b, #311042)", color: "white", borderRadius: "16px", padding: "2rem", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "1.5rem", boxShadow: "0 10px 25px rgba(0,0,0,0.15)" }}>
+            <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 flex flex-col justify-between gap-6">
               <div>
-                <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700 }}>OutreachFlow Campaign Pipeline</h3>
-                <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#c7d2fe" }}>Four simple steps to double your referral response rates:</p>
+                <h3 className="text-xl font-bold tracking-tight">OutreachFlow Campaign Pipeline</h3>
+                <p className="text-sm text-muted-foreground mt-1">Four simple steps to double your referral response rates:</p>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", fontSize: "0.82rem" }}>
-                <div style={{ background: "rgba(255,255,255,0.06)", padding: "10px", borderRadius: "10px" }}>
-                  <span style={{ display: "block", fontSize: "1.1rem", marginBottom: "4px" }}>1️⃣</span>
-                  <strong>Upload Resume</strong>: Upload parsed PDFs to extract skill profiles.
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="bg-muted/50 p-4 rounded-lg flex flex-col gap-1.5">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold mb-1">1</span>
+                  <span><strong>Upload Resume</strong>: Upload parsed PDFs to extract skill profiles.</span>
                 </div>
-                <div style={{ background: "rgba(255,255,255,0.06)", padding: "10px", borderRadius: "10px" }}>
-                  <span style={{ display: "block", fontSize: "1.1rem", marginBottom: "4px" }}>2️⃣</span>
-                  <strong>Import Profiles</strong>: Paste CSV lists of target employees.
+                <div className="bg-muted/50 p-4 rounded-lg flex flex-col gap-1.5">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold mb-1">2</span>
+                  <span><strong>Import Profiles</strong>: Paste CSV lists of target employees.</span>
                 </div>
-                <div style={{ background: "rgba(255,255,255,0.06)", padding: "10px", borderRadius: "10px" }}>
-                  <span style={{ display: "block", fontSize: "1.1rem", marginBottom: "4px" }}>3️⃣</span>
-                  <strong>Approve drafts</strong>: Review contextual AI messages in the approval queue.
+                <div className="bg-muted/50 p-4 rounded-lg flex flex-col gap-1.5">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold mb-1">3</span>
+                  <span><strong>Approve drafts</strong>: Review contextual AI messages in the approval queue.</span>
                 </div>
-                <div style={{ background: "rgba(255,255,255,0.06)", padding: "10px", borderRadius: "10px" }}>
-                  <span style={{ display: "block", fontSize: "1.1rem", marginBottom: "4px" }}>4️⃣</span>
-                  <strong>SMTP Dispatch</strong>: Sequentially send approved emails.
+                <div className="bg-muted/50 p-4 rounded-lg flex flex-col gap-1.5">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold mb-1">4</span>
+                  <span><strong>SMTP Dispatch</strong>: Sequentially send approved emails.</span>
                 </div>
               </div>
             </div>
@@ -1086,19 +1087,9 @@ export function OutreachBoard() {
             </div>
             <button 
               onClick={() => setShowAddProfileModal(true)}
-              style={{
-                padding: "0.6rem 1.25rem",
-                background: "var(--accent)",
-                color: "white",
-                border: "none",
-                borderRadius: "10px",
-                fontWeight: 600,
-                fontSize: "0.9rem",
-                cursor: "pointer",
-                boxShadow: "0 2px 8px rgba(220,104,3,0.15)"
-              }}
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 gap-2"
             >
-              ➕ Add Profiles / Bulk Import
+              <Plus className="w-4 h-4" /> Add Profiles / Bulk Import
             </button>
           </div>
 
@@ -1269,18 +1260,9 @@ export function OutreachBoard() {
             </div>
             <button 
               onClick={() => setShowAddResumeModal(true)}
-              style={{
-                padding: "0.6rem 1.25rem",
-                background: "var(--accent)",
-                color: "white",
-                border: "none",
-                borderRadius: "10px",
-                fontWeight: 600,
-                fontSize: "0.9rem",
-                cursor: "pointer"
-              }}
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 gap-2"
             >
-              ➕ Upload Resume PDF
+              <Plus className="w-4 h-4" /> Upload Resume PDF
             </button>
           </div>
 
@@ -1386,18 +1368,9 @@ export function OutreachBoard() {
             </div>
             <button 
               onClick={() => setShowAddJobModal(true)}
-              style={{
-                padding: "0.6rem 1.25rem",
-                background: "var(--accent)",
-                color: "white",
-                border: "none",
-                borderRadius: "10px",
-                fontWeight: 600,
-                fontSize: "0.9rem",
-                cursor: "pointer"
-              }}
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 gap-2"
             >
-              ➕ Add Job Manually
+              <Plus className="w-4 h-4" /> Add Job Manually
             </button>
           </div>
 
@@ -1540,7 +1513,7 @@ export function OutreachBoard() {
 
           {genQueueJobs.length === 0 ? (
             <div style={{ padding: "4rem", textAlign: "center", background: "#f8fafc", border: "1px dashed var(--border)", borderRadius: "16px" }}>
-              No background jobs enqueued. Go to the &quot;Target Profiles&quot; tab, select profiles, and dispatch generations.
+              No background jobs enqueued. Go to the "Target Profiles" tab, select profiles, and dispatch generations.
             </div>
           ) : (
             <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: "16px", overflow: "hidden", boxShadow: "var(--shadow)" }}>

@@ -63,7 +63,7 @@ export function GmailOutreach() {
   const checkGoogleAuthStatus = async () => {
     try {
       const res = await fetch(`${API_BASE}/outreach/auth/google/status`, {
-        headers: { "bypass-tunnel-reminder": "true" },
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "bypass-tunnel-reminder": "true" },
       });
       const json = await res.json();
       setGoogleAuth({
@@ -80,7 +80,7 @@ export function GmailOutreach() {
     try {
       setLoading(true);
       const res = await fetch(`${API_BASE}/outreach/leads`, {
-        headers: { "bypass-tunnel-reminder": "true" },
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "bypass-tunnel-reminder": "true" },
       });
       const json = await res.json();
       if (json.success) {
@@ -143,7 +143,7 @@ export function GmailOutreach() {
     try {
       const res = await fetch(`${API_BASE}/outreach/leads`, {
         method: "POST",
-        headers: {
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b",
           "Content-Type": "application/json",
           "bypass-tunnel-reminder": "true",
         },
@@ -230,7 +230,7 @@ export function GmailOutreach() {
     try {
       const res = await fetch(`${API_BASE}/outreach/leads`, {
         method: "POST",
-        headers: {
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b",
           "Content-Type": "application/json",
           "bypass-tunnel-reminder": "true",
         },
@@ -271,7 +271,7 @@ export function GmailOutreach() {
       const base64Str = await convertBase64(file);
       const res = await fetch(`${API_BASE}/outreach/leads/extract-image`, {
         method: "POST",
-        headers: {
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b",
           "Content-Type": "application/json",
           "bypass-tunnel-reminder": "true",
         },
@@ -304,7 +304,7 @@ export function GmailOutreach() {
     try {
       const res = await fetch(`${API_BASE}/outreach/leads/${id}`, {
         method: "DELETE",
-        headers: { "bypass-tunnel-reminder": "true" },
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "bypass-tunnel-reminder": "true" },
       });
       const json = await res.json();
       if (json.success) {
@@ -324,7 +324,7 @@ export function GmailOutreach() {
     try {
       const res = await fetch(`${API_BASE}/outreach/messages/${editingMessage.id}`, {
         method: "PATCH",
-        headers: {
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b",
           "Content-Type": "application/json",
           "bypass-tunnel-reminder": "true",
         },
@@ -350,7 +350,7 @@ export function GmailOutreach() {
     try {
       const res = await fetch(`${API_BASE}/outreach/generate-all`, {
         method: "POST",
-        headers: { "bypass-tunnel-reminder": "true" },
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b", "bypass-tunnel-reminder": "true" },
       });
       const json = await res.json();
       alert(json.message);
@@ -433,7 +433,7 @@ export function GmailOutreach() {
     try {
       const res = await fetch(`${API_BASE}/outreach/followups/generate`, {
         method: "POST",
-        headers: {
+        headers: { "X-API-Key": process.env.NEXT_PUBLIC_OUTREACH_API_KEY || "hireflow_sec_key_2026_x92a8b",
           "Content-Type": "application/json",
           "bypass-tunnel-reminder": "true",
         },
@@ -511,106 +511,7 @@ export function GmailOutreach() {
   return (
     <div style={{ fontFamily: "Inter, system-ui, sans-serif", color: "var(--text)" }}>
       
-      {/* 1. GOOGLE CONNECTION BAR */}
-      <div 
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: "24px",
-          padding: "1.25rem 2rem",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "2rem",
-          boxShadow: "var(--shadow)",
-          backdropFilter: "blur(14px)"
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "1.2rem" }}>
-          <div 
-            style={{ 
-              width: "48px", 
-              height: "48px", 
-              borderRadius: "14px", 
-              background: googleAuth.authenticated ? "rgba(16, 185, 129, 0.08)" : "rgba(182, 95, 42, 0.08)",
-              border: googleAuth.authenticated ? "1px solid rgba(16, 185, 129, 0.2)" : "1px solid rgba(182, 95, 42, 0.2)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "1.5rem"
-            }}
-          >
-            {googleAuth.authenticated ? "🛡️" : "🔑"}
-          </div>
-          <div>
-            <h3 style={{ margin: 0, fontSize: "1.05rem", color: "var(--text)", fontWeight: 600 }}>
-              {googleAuth.authenticated ? "Google Account Connected" : "Google OAuth Authentication Required"}
-            </h3>
-            <p style={{ margin: "0.2rem 0 0 0", fontSize: "0.85rem", color: "var(--muted)" }}>
-              {googleAuth.authenticated 
-                ? `Sending campaigns securely from: ${googleAuth.email}` 
-                : "Connect your Gmail account via secure OAuth to dispatch and thread emails."}
-            </p>
-          </div>
-        </div>
-
-        {googleAuth.authenticated ? (
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <span 
-              style={{
-                background: "rgba(16, 185, 129, 0.1)",
-                color: "#059669",
-                border: "1px solid rgba(16, 185, 129, 0.2)",
-                padding: "0.5rem 1rem",
-                borderRadius: "10px",
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.3rem"
-              }}
-            >
-              Connected ✅
-            </span>
-            <button
-              onClick={connectGoogleAccount}
-              style={{
-                background: "transparent",
-                color: "var(--accent)",
-                border: "none",
-                fontSize: "0.8rem",
-                textDecoration: "underline",
-                cursor: "pointer",
-                padding: "0.5rem",
-                fontWeight: 600,
-                transition: "color 0.2s"
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent-dark)")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--accent)")}
-            >
-              Switch Account
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={connectGoogleAccount}
-            style={{
-              background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%)",
-              color: "#fff",
-              border: "none",
-              padding: "0.7rem 1.4rem",
-              borderRadius: "12px",
-              fontWeight: 600,
-              fontSize: "0.9rem",
-              cursor: "pointer",
-              boxShadow: "0 8px 20px -6px rgba(182, 95, 42, 0.4)",
-              transition: "all 0.2s ease"
-            }}
-          >
-            🔌 Connect Google Account
-          </button>
-        )}
-      </div>
+      {/* Google OAuth banner removed as requested */}
 
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr 2fr", gap: "2.5rem", alignItems: "start" }}>
         
@@ -665,8 +566,7 @@ export function GmailOutreach() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                   <label style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 600 }}>Company Name</label>
-                  <input
-                    type="text"
+                  <input type="text" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="Stripe"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
@@ -693,8 +593,7 @@ export function GmailOutreach() {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                   <label style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 600 }}>Recruiter Email</label>
-                  <input
-                    type="email"
+                  <input type="email" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="recruiter@stripe.com"
                     value={recipientEmail}
                     onChange={(e) => setRecipientEmail(e.target.value)}
@@ -723,7 +622,7 @@ export function GmailOutreach() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                 <label style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 600 }}>Job Description Context</label>
-                <textarea
+                <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   rows={6}
                   placeholder="Paste details of the role or specific specs..."
                   value={jobDescription}
@@ -810,7 +709,7 @@ export function GmailOutreach() {
               <h4 style={{ margin: "0 0 0.8rem 0", color: "var(--accent-dark)", fontSize: "0.95rem", fontWeight: 600 }}>
                 📋 Paste Recruiter Details (CSV / JSON)
               </h4>
-              <textarea
+              <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 rows={5}
                 placeholder={`Example CSV:\ncompanyName,recipientEmail,jobDescription\nStripe,recruiter@stripe.com,Software Engineer\n\nOr JSON:\n[{"companyName": "Stripe", "email": "recruiter@stripe.com", "jobDescription": "..."}]`}
                 value={bulkText}
@@ -1239,8 +1138,7 @@ export function GmailOutreach() {
             <form onSubmit={handleSaveMessageEdits} style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                 <label style={{ fontSize: "0.85rem", color: "var(--muted)", fontWeight: 600 }}>Subject Line</label>
-                <input
-                  type="text"
+                <input type="text" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   value={editedSubject}
                   onChange={(e) => setEditedSubject(e.target.value)}
                   required
@@ -1258,7 +1156,7 @@ export function GmailOutreach() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                 <label style={{ fontSize: "0.85rem", color: "var(--muted)", fontWeight: 600 }}>Email Body</label>
-                <textarea
+                <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   rows={10}
                   value={editedBody}
                   onChange={(e) => setEditedBody(e.target.value)}

@@ -446,7 +446,7 @@ outreachRouter.post("/outreach/send-all", requireSendAuth, async (req: Request, 
       },
     });
 
-    const activeLeads = leads.filter((l) => l.messages.length > 0);
+    let activeLeads = leads.filter((l) => l.messages.length > 0);
 
     if (activeLeads.length === 0) {
       res.status(200).json({
@@ -456,12 +456,43 @@ outreachRouter.post("/outreach/send-all", requireSendAuth, async (req: Request, 
       return;
     }
 
+    // 1. Safe Daily Limit Check to protect domain reputation
+    const maxDailyEmails = process.env.MAX_DAILY_EMAILS ? parseInt(process.env.MAX_DAILY_EMAILS, 10) : 50;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const emailsSentToday = await prisma.message.count({
+      where: {
+        sentAt: {
+          gte: startOfToday,
+        },
+      },
+    });
+
+    const allowedToday = Math.max(0, maxDailyEmails - emailsSentToday);
+
+    let infoMsg = "";
+    if (activeLeads.length > allowedToday) {
+      const skippedCount = activeLeads.length - allowedToday;
+      console.warn(`[Outreach Router] Daily sending cap of ${maxDailyEmails} reached! Truncating from ${activeLeads.length} to ${allowedToday} emails (skipping ${skippedCount} to protect reputation).`);
+      activeLeads = activeLeads.slice(0, allowedToday);
+      infoMsg = ` Daily limit reached. Truncating send list to ${allowedToday} emails to protect reputation (skipped ${skippedCount}).`;
+      
+      if (allowedToday === 0) {
+        res.status(429).json({
+          success: false,
+          message: `Daily sending limit of ${maxDailyEmails} reached. No more emails can be sent today.`,
+        });
+        return;
+      }
+    }
+
     console.log(`[Outreach Router] Sequential sending triggered for ${activeLeads.length} emails...`);
 
     // Run execution in background, immediately return 202 to client to avoid HTTP timeouts
     res.status(202).json({
       success: true,
-      message: `Sequentially sending ${activeLeads.length} cold emails. Statuses are updating in real-time.`,
+      message: `Sequentially sending ${activeLeads.length} cold emails with safe 1-3 min delays.${infoMsg}`,
     });
 
     // Background job process
@@ -505,10 +536,10 @@ outreachRouter.post("/outreach/send-all", requireSendAuth, async (req: Request, 
           });
         }
 
-        // Wait 2-5 seconds if there are remaining emails to protect SMTP reputation
+        // Safe spacing delay (1 to 3 minutes) to protect domain and SMTP reputation
         if (i < activeLeads.length - 1) {
-          const delay = 2000 + Math.random() * 3000;
-          console.log(`[Outreach Router] Pausing for ${Math.round(delay)}ms before next email...`);
+          const delay = 60000 + Math.random() * 120000;
+          console.log(`[Outreach Router] Safe spacing active: pausing for ${(delay / 60000).toFixed(2)} minutes before the next email...`);
           await sleep(delay);
         }
       }
